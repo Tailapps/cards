@@ -25,26 +25,7 @@ curl -s "http://127.0.0.1:$port/inbox/debug-feed/log" \
   -d '{"type":"sql","sql":"select * from coupons limit 1","ms":0.84,"connection":"mysql","label":"Query"}'
 ```
 
-## From PHP or Laravel
-
-Copy [DebugFeed.php](DebugFeed.php) into your project (for example `app/Support/DebugFeed.php`, adding a namespace), then:
-
-```php
-DebugFeed::send('Checkout started for order #1042', 'checkout', 'green');
-DebugFeed::send($order);                                   // arrays, models, collections, any object
-DebugFeed::table(['subtotal' => '€129.00', 'discount' => '€64.50'], 'Totals', 'orange');
-DebugFeed::sql('select * from coupons where code = ?', 0.84, 'mysql');
-```
-
-Every query, in a Laravel app's `AppServiceProvider::boot()`:
-
-```php
-if ($this->app->isLocal()) {
-    DB::listen(fn ($query) => DebugFeed::sql($query->toRawSql(), $query->time, $query->connectionName));
-}
-```
-
-It needs nothing else: no package, no config. It reads the port and token from TailApps' files (or `TAILAPPS_FEED_URL` and `TAILAPPS_FEED_TOKEN`), adds the file, line and project to each entry, and never throws. When the inbox says "too many" (it takes 10 posts a second), the rest wait and go as one batch at the end of the request (or a second later in a queue worker or Tinker). Set `DebugFeed::$enabled = false` to silence it.
+Any language works the same way: read the two files, then POST JSON with that header.
 
 ## What the card takes
 

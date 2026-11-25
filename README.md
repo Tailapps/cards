@@ -81,7 +81,7 @@ Ask your agent to build one (TailApps has an MCP server and a [developer guide](
 | [Linear](linear.json) | The Linear issues assigned to you. Sign in with Linear on the card, no API key. Works on your Mac and your iPhone; each one signs in on its own. |
 | [Ports](ports.json) | What is listening on this computer's TCP ports, with a Kill button. A tool for this computer only, so it doesn't sync. |
 | [VM Board](vm-board.json) | Your VMPal VMs with Start, Stop, Open and a Peek screenshot, from your Mac. For your iPhone, turn on Show on my iPhone and Sync to My Devices: it starts, stops and peeks at VMs via your Mac. |
-| [Debug Feed](debug-feed.json) | A live feed of what your code sends it: messages, values as JSON, SQL with timings and tables, labelled and coloured. Search, filter, pause, pin and copy. Mac only. Senders for curl and PHP/Laravel are in [debug-feed-senders](debug-feed-senders/). |
+| [Debug Feed](debug-feed.json) | A live feed of what your code sends it: messages, values as JSON, SQL with timings and tables, labelled and coloured. Search, filter, pause, pin and copy. Mac only. A shell sender and a curl recipe are in [debug-feed-senders](debug-feed-senders/). |
 
 ### System
 

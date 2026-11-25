@@ -2,11 +2,12 @@
   "schema": "tailapps/v0",
   "app": "debug-feed",
   "name": "Debug Feed",
-  "description": "A live feed of what your code sends it: messages, values as JSON, SQL with timings and tables, labelled and coloured. Search, filter, pause, pin and copy. Mac only.",
+  "description": "A live feed of what your code sends: messages, values as JSON, SQL with timings, tables, labelled and coloured. Any language posts JSON to 127.0.0.1:47312. Search, filter, pause, pin, copy. Mac only.",
   "icon": "ladybug",
-  "version": 1,
+  "version": 2,
   "permissions": [
     "inbox:log",
+    "listen:47312",
     "clipboard.write"
   ],
   "state": {
@@ -58,6 +59,7 @@
   "sources": {
     "incoming": {
       "inbox": "log",
+      "port": 47312,
       "on_receive": "take",
       "platforms": [
         "macos"

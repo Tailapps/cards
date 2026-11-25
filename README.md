@@ -27,7 +27,7 @@ Ask your agent to build one (TailApps has an MCP server and a [developer guide](
 | [Expenses](expenses.json) | Jot down what you spend and see the total, what's still to pay, the five biggest and a split by category. On the Mac and iPhone. |
 | [Plants](plants.json) | When each plant was last watered. Tap one for its own screen, with Watered and Delete. Plants and History are tabs along the bottom on the iPhone and in the Mac's pop-out. |
 | [World Clock](world-clock.json) | Your cities' times, days and working hours, who's there and how to say hello. Reorder them, slide a day ahead or back to plan a call. Same cities on all your devices. |
-| [Timers](timers.json) | As many timers as you like, each with its own colour and alarm. Type 4:30, 25 or "Tea 10 min" to start one. Alarms ring with TailApps closed; with sync on, timers run on all your devices. |
+| [Timer](timer.json) | One countdown: type a length like 4:30 or 25, or tap a preset, then start. Name it and pick its colour in Settings. It rings even with TailApps closed, and with sync on it runs on all your devices. |
 | [Pomodoro](pomodoro.json) | A focus timer with short and long breaks and a notification when each ends, on your Mac or iPhone. To share one timer, turn on "Share the timer" on each device, then Sync to My Devices. |
 
 ### Tools

@@ -1,0 +1,639 @@
+{
+  "schema": "tailapps/v0",
+  "app": "timer",
+  "name": "Timer",
+  "description": "One countdown timer: type a length like 4:30 or 25, or tap a preset, then start. It rings even with TailApps closed, and with sync on it runs on all your devices.",
+  "icon": "timer",
+  "version": 4,
+  "on_sync": "reschedule",
+  "permissions": [
+    "notify"
+  ],
+  "state": {
+    "name": {
+      "type": "text",
+      "sync": true,
+      "default": "Timer"
+    },
+    "hue": {
+      "type": "text",
+      "sync": true,
+      "default": "orange"
+    },
+    "alarm": {
+      "type": "bool",
+      "sync": true,
+      "default": true
+    },
+    "length": {
+      "type": "number",
+      "sync": true,
+      "default": 300
+    },
+    "left": {
+      "type": "number",
+      "sync": true,
+      "default": 300
+    },
+    "ends_at": {
+      "type": "number",
+      "sync": true,
+      "default": 0
+    },
+    "started_at": {
+      "type": "number",
+      "sync": true,
+      "default": 0
+    },
+    "status": {
+      "type": "text",
+      "sync": true,
+      "default": "idle"
+    },
+    "entry": {
+      "type": "text",
+      "default": ""
+    },
+    "fresh": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "column": [
+              {
+                "row": [
+                  {
+                    "timer": "$ends_at",
+                    "mode": "until",
+                    "size": "xxl",
+                    "grow": true,
+                    "when": "$status | map:{running:true, else:false}",
+                    "on_end": "finished"
+                  },
+                  {
+                    "text": "$left | duration:'clock'",
+                    "size": "xxl",
+                    "grow": true,
+                    "when": "$status | map:{running:false, else:true}"
+                  },
+                  {
+                    "button": "Restart",
+                    "icon": "arrow.counterclockwise",
+                    "icon_only": true,
+                    "style": "plain",
+                    "size": "l",
+                    "on": "restart"
+                  },
+                  {
+                    "button": "Start",
+                    "icon": "play.fill",
+                    "icon_only": true,
+                    "style": "plain",
+                    "size": "l",
+                    "on": "start",
+                    "keys": "mod+return",
+                    "when": "$status | map:{running:false, else:true}"
+                  },
+                  {
+                    "button": "Pause",
+                    "icon": "pause.fill",
+                    "icon_only": true,
+                    "style": "plain",
+                    "size": "l",
+                    "on": "pause",
+                    "keys": "mod+return",
+                    "when": "$status | map:{running:true, else:false}"
+                  }
+                ],
+                "align": "center",
+                "gap": "s"
+              },
+              {
+                "progress": "$ends_at",
+                "from": "$started_at",
+                "style": "bar",
+                "when": "$status | map:{running:true, else:false}"
+              },
+              {
+                "row": [
+                  {
+                    "text": "$name",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "icon": "$alarm | map:{true:'bell.fill', else:'bell.slash'}",
+                    "size": "s"
+                  },
+                  {
+                    "text": "$length | duration",
+                    "size": "s",
+                    "emphasis": "subtle"
+                  },
+                  {
+                    "spacer": true
+                  },
+                  {
+                    "text": "Ends {$ends_at | time}",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$status | map:{running:true, else:false}"
+                  },
+                  {
+                    "text": "Ends {$left | add:$now | time}",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$status | map:{running:false, else:true}"
+                  }
+                ],
+                "align": "center",
+                "gap": "s"
+              }
+            ],
+            "style": "tile",
+            "hue": "$hue",
+            "gap": "xs"
+          },
+          {
+            "row": [
+              {
+                "field": "Length",
+                "type": "text",
+                "bind": "$entry",
+                "placeholder": "4:30, 25 or 1h 30m",
+                "on_submit": "set_entry",
+                "grow": true
+              },
+              {
+                "button": "Set",
+                "on": "set_entry",
+                "style": "secondary",
+                "disabled": "$entry | seconds | map:{null:true, 0:true, else:false}"
+              }
+            ],
+            "align": "end",
+            "gap": "s"
+          },
+          {
+            "row": [
+              {
+                "button": "1 min",
+                "on": "preset",
+                "args": {
+                  "length": 60
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "3 min",
+                "on": "preset",
+                "args": {
+                  "length": 180
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "5 min",
+                "on": "preset",
+                "args": {
+                  "length": 300
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "10 min",
+                "on": "preset",
+                "args": {
+                  "length": 600
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "15 min",
+                "on": "preset",
+                "args": {
+                  "length": 900
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "25 min",
+                "on": "preset",
+                "args": {
+                  "length": 1500
+                },
+                "style": "secondary",
+                "size": "s"
+              },
+              {
+                "button": "1 hour",
+                "on": "preset",
+                "args": {
+                  "length": 3600
+                },
+                "style": "secondary",
+                "size": "s"
+              }
+            ],
+            "wrap": true,
+            "gap": "s"
+          },
+          {
+            "section": "Settings",
+            "collapsible": true,
+            "collapsed": true,
+            "children": [
+              {
+                "field": "Name",
+                "type": "text",
+                "bind": "$name",
+                "placeholder": "Timer",
+                "on_change": "reschedule"
+              },
+              {
+                "field": "Colour",
+                "type": "color",
+                "bind": "$hue"
+              },
+              {
+                "field": "Alarm when it ends",
+                "type": "toggle",
+                "value": "$alarm",
+                "on_change": "set_alarm"
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "mini",
+      "layout": {
+        "column": [
+          {
+            "timer": "$ends_at",
+            "mode": "until",
+            "size": "fill",
+            "when": "$status | map:{running:true, else:false}"
+          },
+          {
+            "text": "$left | duration:'clock'",
+            "size": "fill",
+            "when": "$status | map:{running:false, else:true}"
+          },
+          {
+            "row": [
+              {
+                "text": "$name",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Restart",
+                "icon": "arrow.counterclockwise",
+                "icon_only": true,
+                "style": "plain",
+                "on": "restart"
+              },
+              {
+                "button": "Start",
+                "icon": "play.fill",
+                "icon_only": true,
+                "style": "plain",
+                "on": "start",
+                "when": "$status | map:{running:false, else:true}"
+              },
+              {
+                "button": "Pause",
+                "icon": "pause.fill",
+                "icon_only": true,
+                "style": "plain",
+                "on": "pause",
+                "when": "$status | map:{running:true, else:false}"
+              }
+            ],
+            "align": "center",
+            "gap": "s"
+          }
+        ],
+        "style": "tile",
+        "hue": "$hue",
+        "gap": "xs"
+      }
+    }
+  ],
+  "actions": {
+    "start": {
+      "steps": [
+        {
+          "if": "$left | map:{0:true, null:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "left": "$length"
+              }
+            }
+          ]
+        },
+        {
+          "set": {
+            "ends_at": "$now",
+            "started_at": "$now",
+            "status": "running"
+          }
+        },
+        {
+          "increment": {
+            "ends_at": "$left",
+            "started_at": "$left"
+          }
+        },
+        {
+          "increment": {
+            "started_at": "-$length"
+          }
+        },
+        {
+          "if": "$alarm",
+          "then": [
+            {
+              "notify": {
+                "title": "$name",
+                "body": "Time's up",
+                "at": "$ends_at",
+                "id": "timer"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pause": {
+      "steps": [
+        {
+          "set": {
+            "left": "$ends_at"
+          }
+        },
+        {
+          "increment": {
+            "left": "-$now"
+          },
+          "min": 0
+        },
+        {
+          "set": {
+            "ends_at": 0,
+            "status": "paused"
+          }
+        },
+        {
+          "notify": {
+            "cancel": "timer"
+          }
+        }
+      ]
+    },
+    "restart": {
+      "steps": [
+        {
+          "set": {
+            "left": "$length",
+            "ends_at": 0,
+            "started_at": 0,
+            "status": "idle"
+          }
+        },
+        {
+          "notify": {
+            "cancel": "timer"
+          }
+        }
+      ]
+    },
+    "finished": {
+      "steps": [
+        {
+          "if": "$status | map:{running:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "fresh": "$ends_at"
+              }
+            },
+            {
+              "increment": {
+                "fresh": 10
+              }
+            },
+            {
+              "increment": {
+                "fresh": "-$now"
+              },
+              "min": 0
+            },
+            {
+              "set": {
+                "left": "$length",
+                "ends_at": 0,
+                "started_at": 0,
+                "status": "idle"
+              }
+            },
+            {
+              "if": "$alarm",
+              "then": [
+                {
+                  "if": "$fresh",
+                  "then": [
+                    {
+                      "sound": "alert"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "set_entry": {
+      "steps": [
+        {
+          "if": "$entry | seconds",
+          "then": [
+            {
+              "set": {
+                "length": "$entry | seconds"
+              }
+            },
+            {
+              "set": {
+                "left": "$length",
+                "ends_at": 0,
+                "started_at": 0,
+                "status": "idle"
+              }
+            },
+            {
+              "notify": {
+                "cancel": "timer"
+              }
+            },
+            {
+              "set": {
+                "entry": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "preset": {
+      "args": {
+        "length": "number"
+      },
+      "steps": [
+        {
+          "set": {
+            "length": "$args.length"
+          }
+        },
+        {
+          "set": {
+            "left": "$length",
+            "ends_at": 0,
+            "started_at": 0,
+            "status": "idle"
+          }
+        },
+        {
+          "notify": {
+            "cancel": "timer"
+          }
+        }
+      ]
+    },
+    "set_alarm": {
+      "steps": [
+        {
+          "set": {
+            "alarm": "$args.value"
+          }
+        },
+        {
+          "notify": {
+            "cancel": "timer"
+          }
+        },
+        {
+          "if": "$status | map:{running:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "left": "$ends_at"
+              }
+            },
+            {
+              "increment": {
+                "left": "-$now"
+              },
+              "min": 0
+            },
+            {
+              "if": "$left",
+              "then": [
+                {
+                  "if": "$alarm",
+                  "then": [
+                    {
+                      "notify": {
+                        "title": "$name",
+                        "body": "Time's up",
+                        "at": "$ends_at",
+                        "id": "timer"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "reschedule": {
+      "steps": [
+        {
+          "notify": {
+            "cancel": "timer"
+          }
+        },
+        {
+          "if": "$status | map:{running:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "left": "$ends_at"
+              }
+            },
+            {
+              "increment": {
+                "left": "-$now"
+              },
+              "min": 0
+            },
+            {
+              "if": "$left",
+              "then": [
+                {
+                  "if": "$alarm",
+                  "then": [
+                    {
+                      "notify": {
+                        "title": "$name",
+                        "body": "Time's up",
+                        "at": "$ends_at",
+                        "id": "timer"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "timer",
+      "label": "{$ends_at | until}{$status | map:{paused:'Paused', else:''}}",
+      "label_tone": "$status | map:{running:'accent', else:'neutral'}",
+      "label_icon": "$status | map:{running:'timer', paused:'pause.circle', else:'timer'}",
+      "label_fill": "$hue",
+      "card": "main"
+    },
+    "floating": {
+      "card": "mini",
+      "width": "narrow",
+      "pin": true,
+      "chrome": "none"
+    }
+  },
+  "style": {
+    "accent": "#f97316"
+  }
+}

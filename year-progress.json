@@ -2,7 +2,7 @@
   "schema": "tailapps/v0",
   "app": "year-progress",
   "name": "Year Progress",
-  "description": "How much of the year has gone, as a big number and a bar, with the day of the year and the days still to go. Underneath: this quarter, month, week and today. The year's percentage can sit in your menu bar.",
+  "description": "How much of the year has gone, as a big number and a bar, with the day of the year and the days left, plus this quarter, month, week and today. Show the year's % in your menu bar.",
   "icon": "calendar.badge.clock",
   "version": 1,
   "permissions": [],

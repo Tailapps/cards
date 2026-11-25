@@ -29,7 +29,7 @@ Ask your agent to build one (TailApps has an MCP server and a [developer guide](
 | [World Clock](world-clock.json) | Your cities' times, days and working hours, who's there and how to say hello. Reorder them, slide a day ahead or back to plan a call. Same cities on all your devices. |
 | [Timer](timer.json) | One countdown: type a length like 4:30 or 25, or tap a preset, then start. Name it and pick its colour in Settings. It rings even with TailApps closed, and with sync on it runs on all your devices. |
 | [Pomodoro](pomodoro.json) | A focus timer with short and long breaks and a notification when each ends, on your Mac or iPhone. To share one timer, turn on "Share the timer" on each device, then Sync to My Devices. |
-| [Year Progress](year-progress.json) | How much of the year has gone, as a big number and a bar, with the day of the year and the days still to go. Underneath: this quarter, month, week and today. The year's percentage can sit in your menu bar. Needs TailApps with the `through` formatter. |
+| [Year Progress](year-progress.json) | How much of the year has gone, as a big number and a bar, with the day of the year and the days left, plus this quarter, month, week and today. Show the year's % in your menu bar. Needs TailApps with the `through` formatter. |
 
 ### Tools
 

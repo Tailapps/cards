@@ -1,0 +1,177 @@
+{
+  "schema": "tailapps/v0",
+  "app": "system-monitor",
+  "name": "System Monitor",
+  "description": "CPU, GPU, memory and disk for this Mac, as gauges and a breakdown that update every 10 seconds. Mac only, with no script.",
+  "icon": "gauge.with.dots.needle.67percent",
+  "version": 1,
+  "permissions": [
+    "usage.read"
+  ],
+  "sources": {
+    "stats": {
+      "system": "usage",
+      "every": 10
+    }
+  },
+  "actions": {
+    "refresh": {
+      "steps": [
+        {
+          "refresh": "stats"
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "icon": "laptopcomputer",
+                "tone": "neutral"
+              },
+              {
+                "text": "This Mac",
+                "emphasis": "strong"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "grid": [
+              {
+                "gauge": "$stats.memory.share",
+                "style": "ticks",
+                "scale": [
+                  "blue",
+                  "green",
+                  "yellow"
+                ],
+                "label": "Memory",
+                "size": "l"
+              },
+              {
+                "gauge": "$stats.cpu",
+                "style": "ticks",
+                "scale": [
+                  "blue",
+                  "green",
+                  "yellow"
+                ],
+                "label": "CPU",
+                "size": "l"
+              },
+              {
+                "gauge": "$stats.gpu",
+                "style": "ticks",
+                "scale": [
+                  "blue",
+                  "green",
+                  "yellow"
+                ],
+                "label": "GPU",
+                "size": "l"
+              }
+            ],
+            "columns": 3,
+            "align": "center"
+          },
+          {
+            "divider": true
+          },
+          {
+            "row": [
+              {
+                "text": "**{$stats.disk.free | bytes}** free",
+                "markdown": true,
+                "size": "l"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "text": "of {$stats.disk.total | bytes}",
+                "size": "s",
+                "emphasis": "subtle"
+              }
+            ],
+            "align": "center"
+          },
+          {
+            "progress": "$stats.disk.free_share",
+            "style": "segmented",
+            "scale": [
+              "red",
+              "yellow",
+              "green"
+            ]
+          },
+          {
+            "progress": [
+              {
+                "value": "$stats.memory.app",
+                "hue": "blue",
+                "label": "Apps"
+              },
+              {
+                "value": "$stats.memory.wired",
+                "hue": "orange",
+                "label": "Wired"
+              },
+              {
+                "value": "$stats.memory.compressed",
+                "hue": "purple",
+                "label": "Compressed"
+              }
+            ],
+            "max": "$stats.memory.total",
+            "label": "Memory in use"
+          },
+          {
+            "text": "{icon:internaldrive.fill:gray} **{$stats.disk.used | bytes}** used on disk, {icon:memorychip.fill:blue} **{$stats.memory.app | bytes}** held by apps.",
+            "markdown": true,
+            "size": "s"
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          {
+            "text": "Checked {$meta.stats.updated | ago}",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "spacer": true
+          },
+          {
+            "button": "Refresh",
+            "on": "refresh",
+            "style": "plain",
+            "keys": "mod+r"
+          }
+        ],
+        "align": "center"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "gauge.with.dots.needle.67percent",
+      "label": "CPU {$stats.cpu | percent:0}",
+      "label_tone": "$stats.cpu | tone:{good:'<0.7', warn:'<0.9', else:'bad'}",
+      "card": "main",
+      "in_menu": "row"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

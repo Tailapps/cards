@@ -1,0 +1,58 @@
+{
+  "schema": "tailapps/v0",
+  "app": "device-status",
+  "name": "Device Status",
+  "description": "This device's battery, connection and basics at a glance, on the Mac and iPhone alike, with no script.",
+  "icon": "iphone.gen3",
+  "version": 1,
+  "permissions": ["power.read", "network.read"],
+  "sources": {
+    "power": { "system": "power" },
+    "net": { "system": "network" },
+    "me": { "system": "device" }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              { "stat": "{$power.battery | default:'—'}%", "label": "Battery", "tone": "$power.battery | tone:{bad:'<20', warn:'<40', else:'good'}" },
+              { "spacer": true },
+              { "stat": "$net.online | map:{true:'Online', else:'Offline'}", "label": "$net.interface | map:{wifi:'Wi-Fi', ethernet:'Cable', cellular:'Mobile data', else:'Connection'}", "tone": "$net.online | tone:{true:'good', else:'bad'}" }
+            ],
+            "align": "start",
+            "when": "$power"
+          },
+          {
+            "progress": "$power.battery",
+            "max": 100,
+            "label": "$power.status | map:{charging:'Charging', plugged_in:'Plugged in', battery:'On battery'}",
+            "when": "$power.battery"
+          },
+          {
+            "column": [
+              { "cell": "$me.name", "subtitle": "{$me.os | map:{macos:'macOS', ios:'iOS'}} {$me.os_version}", "leading": "$me.kind | map:{mac:'laptopcomputer', iphone:'iphone', ipad:'ipad', else:'desktopcomputer'}" },
+              { "cell": "Time zone", "trailing": { "text": "$me.time_zone", "emphasis": "subtle" } },
+              { "cell": "Appearance", "trailing": { "text": "$me.appearance | map:{dark:'Dark', light:'Light'}", "emphasis": "subtle" } },
+              { "cell": "Low Power Mode", "trailing": { "badge": "$power.low_power | map:{true:'On', else:'Off'}", "tone": "$power.low_power | tone:{true:'warn', else:'neutral'}" } }
+            ],
+            "style": "inset",
+            "when": "$me"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "battery.75percent",
+      "label": "{$power.battery | default:'—'}%",
+      "label_tone": "$power.battery | tone:{bad:'<20', warn:'<40', else:'good'}",
+      "card": "main"
+    },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "tailapps/v0",
+  "app": "device-messenger",
+  "name": "Device Messenger",
+  "description": "Type a message, choose how it arrives and which of your devices get it, then send. Each device shows who it came from. Turn on ⋯ › Sync to My Devices on each one.",
+  "icon": "bubble.left.and.text.bubble.right",
+  "version": 1,
+  "permissions": ["inbox:messages", "send:messages", "notify"],
+  "settings": {
+    "notify": { "type": "toggle", "label": "Notify me on this Mac when a message arrives", "default": true, "platforms": ["macos"] }
+  },
+  "state": {
+    "draft": { "type": "text", "default": "", "sync": false },
+    "kind": { "type": "text", "default": "note", "sync": false },
+    "loud": { "type": "bool", "default": true, "sync": false },
+    "picked": { "type": "list", "default": [], "sync": false },
+    "log": { "type": "list", "default": [] }
+  },
+  "sources": {
+    "messages": { "inbox": "messages", "on_receive": "received" },
+    "devices": { "devices": "others" }
+  },
+  "actions": {
+    "send": {
+      "steps": [
+        { "if": "$draft", "then": [
+          { "if": "$loud", "then": [
+            { "send": { "messages": { "text": "$draft", "kind": "$kind", "at": "$now" } }, "to": "$picked", "alert": "{$kind | upper}: {$draft}" }
+          ], "else": [
+            { "send": { "messages": { "text": "$draft", "kind": "$kind", "at": "$now" } }, "to": "$picked" }
+          ] },
+          { "push": { "log": { "text": "$draft", "kind": "$kind", "who": "me", "device": "", "at": "$now" } }, "at": "end", "max": 50 },
+          { "set": { "draft": "" } }
+        ] }
+      ]
+    },
+    "received": {
+      "steps": [
+        { "if": "$args.event.text", "then": [
+          { "push": { "log": { "text": "$args.event.text", "kind": "$args.event.kind", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+          { "if": "$settings.notify", "then": [
+            { "notify": { "title": "{$args.event.kind | upper} from {$args.from}", "body": "$args.event.text" } }
+          ] }
+        ] }
+      ]
+    },
+    "clear": {
+      "confirm": "Clear the messages on this device?",
+      "steps": [
+        { "set": { "log": [] } }
+      ]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "list": "$log", "scroll": "end", "height": "fill", "empty": "No messages yet.",
+          "item": { "message": "$item.text", "from": "$item.who", "name": "{$item.device} · {$item.kind}", "time": "$item.at | ago", "avatar": null } },
+        { "field": "Message", "type": "textarea", "bind": "$draft", "placeholder": "Type a message" },
+        { "field": "Kind", "type": "segmented", "bind": "$kind", "options": [
+          { "label": "Note", "value": "note" }, { "label": "Task", "value": "task" }, { "label": "Urgent", "value": "urgent" }
+        ] },
+        { "field": "Alert on iPhone", "type": "toggle", "bind": "$loud" },
+        { "text": "Send to", "size": "s", "emphasis": "subtle" },
+        { "checklist": "$devices", "label": "$item.label", "value": "$item.value", "bind": "$picked" },
+        { "text": "Sign in on another device to send to it.", "size": "s", "emphasis": "subtle", "when": "$devices | count | map:{0:true, else:false}" },
+        { "row": [
+          { "button": "Clear", "on": "clear", "style": "plain" },
+          { "spacer": true },
+          { "button": "Send", "on": "send", "style": "primary",
+            "disabled": "$picked | count | map:{0:true, else:false}" }
+        ], "align": "center" }
+      ],
+      "gap": "s"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "bubble.left.and.text.bubble.right", "in_menu": "row", "label": "{$log | count} messages", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

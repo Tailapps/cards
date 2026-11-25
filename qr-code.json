@@ -1,0 +1,190 @@
+{
+  "schema": "tailapps/v0",
+  "app": "qr-code",
+  "name": "QR Code",
+  "description": "Make a QR code for a link, a Wi-Fi network, a contact card or any text, right on this device, ready to scan with a phone camera.",
+  "icon": "qrcode",
+  "version": 1,
+  "permissions": ["open:url"],
+  "state": {
+    "kind": { "type": "text", "default": "link" },
+    "link": { "type": "text", "default": "https://tailapps.com" },
+    "ssid": { "type": "text", "default": "" },
+    "password": { "type": "text", "default": "" },
+    "security": { "type": "text", "default": "WPA" },
+    "hidden": { "type": "bool", "default": false },
+    "first_name": { "type": "text", "default": "" },
+    "last_name": { "type": "text", "default": "" },
+    "company": { "type": "text", "default": "" },
+    "phone": { "type": "text", "default": "" },
+    "email": { "type": "text", "default": "" },
+    "text": { "type": "text", "default": "" }
+  },
+  "actions": {
+    "open_link": { "steps": [{ "open": "$link" }] },
+    "security_changed": { "steps": [{ "if": "$args.value | map:{nopass:true, else:false}", "then": [{ "set": { "password": "" } }] }] }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "field": "Kind",
+            "type": "segmented",
+            "bind": "$kind",
+            "options": [
+              { "label": "Link", "value": "link", "icon": "link" },
+              { "label": "Wi-Fi", "value": "wifi", "icon": "wifi" },
+              { "label": "Contact", "value": "contact", "icon": "person.crop.circle" },
+              { "label": "Text", "value": "text", "icon": "text.alignleft" }
+            ]
+          },
+          {
+            "column": [{ "field": "Link", "type": "text", "bind": "$link", "placeholder": "https://example.com" }],
+            "when": "$kind | map:{link:true, else:false}"
+          },
+          {
+            "column": [
+              { "field": "Network name", "type": "text", "bind": "$ssid", "placeholder": "Home Wi-Fi" },
+              {
+                "field": "Password",
+                "type": "text",
+                "bind": "$password",
+                "placeholder": "Password",
+                "disabled": "$security | map:{nopass:true, else:false}"
+              },
+              {
+                "field": "Security",
+                "type": "segmented",
+                "bind": "$security",
+                "options": [{ "label": "WPA/WPA3", "value": "WPA" }, { "label": "WEP", "value": "WEP" }, { "label": "None", "value": "nopass" }],
+                "on_change": "security_changed"
+              },
+              { "field": "Hidden network", "type": "toggle", "bind": "$hidden" }
+            ],
+            "gap": "s",
+            "when": "$kind | map:{wifi:true, else:false}"
+          },
+          {
+            "column": [
+              { "field": "First name", "type": "text", "bind": "$first_name", "placeholder": "Ada" },
+              { "field": "Last name", "type": "text", "bind": "$last_name", "placeholder": "Lovelace" },
+              { "field": "Company", "type": "text", "bind": "$company", "placeholder": "Optional" },
+              { "field": "Phone", "type": "text", "bind": "$phone", "placeholder": "+44 20 7946 0000" },
+              { "field": "Email", "type": "text", "bind": "$email", "placeholder": "ada@example.com" }
+            ],
+            "gap": "s",
+            "when": "$kind | map:{contact:true, else:false}"
+          },
+          {
+            "column": [{ "field": "Text", "type": "textarea", "bind": "$text", "placeholder": "Anything up to a couple of thousand characters" }],
+            "when": "$kind | map:{text:true, else:false}"
+          },
+          {
+            "column": [
+              { "qr": "$link", "size": "l", "label": "Scan to open the link", "when": "$link" },
+              {
+                "text": "Type a link to make its code",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$link | count | map:{0:true, else:false}"
+              },
+              { "button": "Open link", "icon": "safari", "style": "secondary", "size": "s", "on": "open_link", "when": "$link" },
+              {
+                "section": "What it holds",
+                "collapsible": true,
+                "collapsed": true,
+                "when": "$link",
+                "children": [{ "code": "$link", "lines": 8 }]
+              }
+            ],
+            "gap": "s",
+            "align": "center",
+            "when": "$kind | map:{link:true, else:false}"
+          },
+          {
+            "column": [
+              {
+                "qr": "WIFI:T:{$security};S:{$ssid | encode:'wifi'};P:{$password | encode:'wifi'};H:{$hidden};;",
+                "size": "l",
+                "label": "Scan to join {$ssid}",
+                "when": "$ssid"
+              },
+              {
+                "text": "Type the network name to make its code",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$ssid | count | map:{0:true, else:false}"
+              },
+              {
+                "section": "What it holds",
+                "collapsible": true,
+                "collapsed": true,
+                "when": "$ssid",
+                "children": [{ "code": "WIFI:T:{$security};S:{$ssid | encode:'wifi'};P:{$password | encode:'wifi'};H:{$hidden};;", "lines": 8 }]
+              }
+            ],
+            "gap": "s",
+            "align": "center",
+            "when": "$kind | map:{wifi:true, else:false}"
+          },
+          {
+            "column": [
+              {
+                "qr": "BEGIN:VCARD\nVERSION:3.0\nN:{$last_name | encode:'vcard'};{$first_name | encode:'vcard'};;;\nFN:{$first_name | encode:'vcard'} {$last_name | encode:'vcard'}\nORG:{$company | encode:'vcard'}\nTEL:{$phone | encode:'vcard'}\nEMAIL:{$email | encode:'vcard'}\nEND:VCARD",
+                "size": "l",
+                "label": "Scan to add {$first_name} {$last_name}",
+                "when": "$first_name"
+              },
+              {
+                "text": "Type a first name to make the contact card",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$first_name | count | map:{0:true, else:false}"
+              },
+              {
+                "section": "What it holds",
+                "collapsible": true,
+                "collapsed": true,
+                "when": "$first_name",
+                "children": [
+                  {
+                    "code": "BEGIN:VCARD\nVERSION:3.0\nN:{$last_name | encode:'vcard'};{$first_name | encode:'vcard'};;;\nFN:{$first_name | encode:'vcard'} {$last_name | encode:'vcard'}\nORG:{$company | encode:'vcard'}\nTEL:{$phone | encode:'vcard'}\nEMAIL:{$email | encode:'vcard'}\nEND:VCARD",
+                    "lines": 8
+                  }
+                ]
+              }
+            ],
+            "gap": "s",
+            "align": "center",
+            "when": "$kind | map:{contact:true, else:false}"
+          },
+          {
+            "column": [
+              { "qr": "$text", "size": "l", "label": "Scan to read the text", "when": "$text" },
+              {
+                "text": "Type some text to make its code",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$text | count | map:{0:true, else:false}"
+              },
+              {
+                "section": "What it holds",
+                "collapsible": true,
+                "collapsed": true,
+                "when": "$text",
+                "children": [{ "code": "$text", "lines": 8 }]
+              }
+            ],
+            "gap": "s",
+            "align": "center",
+            "when": "$kind | map:{text:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": { "menubar": { "icon": "qrcode", "card": "main" }, "floating": { "card": "main", "width": "default" } }
+}

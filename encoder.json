@@ -1,0 +1,217 @@
+{
+  "schema": "tailapps/v0",
+  "app": "encoder",
+  "name": "Encode & Decode",
+  "description": "Paste text to see it as Base64, URL-safe Base64, hex and percent-encoding, decode any of those back, or get its SHA-256, SHA-1, MD5 and SHA-512 hashes. Everything runs on this device.",
+  "icon": "chevron.left.forwardslash.chevron.right",
+  "version": 1,
+  "permissions": ["clipboard.write"],
+  "state": { "mode": { "type": "text", "default": "encode" }, "input": { "type": "text", "default": "Hello, TailApps!" } },
+  "actions": {
+    "copy": { "args": { "text": "text" }, "steps": [{ "clipboard.write": { "text": "$args.text" } }] },
+    "clear": { "steps": [{ "set": { "input": "" } }] }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "field": "Mode",
+            "type": "segmented",
+            "bind": "$mode",
+            "options": [
+              { "label": "Encode", "value": "encode", "icon": "lock" },
+              { "label": "Decode", "value": "decode", "icon": "lock.open" },
+              { "label": "Hash", "value": "hash", "icon": "number" }
+            ]
+          },
+          { "field": "Input", "type": "textarea", "bind": "$input", "placeholder": "Type or paste text" },
+          {
+            "column": [
+              {
+                "column": [
+                  {
+                    "cell": "Base64",
+                    "subtitle": "$input | encode:'base64'",
+                    "leading": "textformat",
+                    "trailing": {
+                      "button": "Copy Base64",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | encode:'base64'" }
+                    }
+                  },
+                  {
+                    "cell": "Base64 URL",
+                    "subtitle": "$input | encode:'base64url'",
+                    "leading": "link",
+                    "trailing": {
+                      "button": "Copy Base64 URL",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | encode:'base64url'" }
+                    }
+                  },
+                  {
+                    "cell": "Hex",
+                    "subtitle": "$input | encode:'hex'",
+                    "leading": "number.square",
+                    "trailing": {
+                      "button": "Copy Hex",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | encode:'hex'" }
+                    }
+                  },
+                  {
+                    "cell": "URL",
+                    "subtitle": "$input | url",
+                    "leading": "percent",
+                    "trailing": {
+                      "button": "Copy URL",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | url" }
+                    }
+                  }
+                ],
+                "style": "inset",
+                "when": "$mode | map:{encode:true, else:false}"
+              },
+              {
+                "column": [
+                  {
+                    "cell": "From Base64",
+                    "subtitle": "$input | decode:'base64' | default:'Not valid Base64'",
+                    "leading": "textformat",
+                    "trailing": {
+                      "button": "Copy From Base64",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | decode:'base64'" },
+                      "disabled": "$input | decode:'base64' | count | map:{0:true, else:false}"
+                    },
+                    "status": "$input | decode:'base64' | count | tone:{bad:'=0', else:'good'}"
+                  },
+                  {
+                    "cell": "From hex",
+                    "subtitle": "$input | decode:'hex' | default:'Not valid hex'",
+                    "leading": "number.square",
+                    "trailing": {
+                      "button": "Copy From hex",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | decode:'hex'" },
+                      "disabled": "$input | decode:'hex' | count | map:{0:true, else:false}"
+                    },
+                    "status": "$input | decode:'hex' | count | tone:{bad:'=0', else:'good'}"
+                  },
+                  {
+                    "cell": "From URL",
+                    "subtitle": "$input | decode:'url' | default:'Not valid percent-encoding'",
+                    "leading": "percent",
+                    "trailing": {
+                      "button": "Copy From URL",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | decode:'url'" },
+                      "disabled": "$input | decode:'url' | count | map:{0:true, else:false}"
+                    },
+                    "status": "$input | decode:'url' | count | tone:{bad:'=0', else:'good'}"
+                  }
+                ],
+                "style": "inset",
+                "when": "$mode | map:{decode:true, else:false}"
+              },
+              {
+                "column": [
+                  {
+                    "cell": "SHA-256",
+                    "subtitle": "$input | hash:'sha256'",
+                    "leading": "checkmark.seal",
+                    "trailing": {
+                      "button": "Copy SHA-256",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | hash:'sha256'" }
+                    }
+                  },
+                  {
+                    "cell": "SHA-1",
+                    "subtitle": "$input | hash:'sha1'",
+                    "leading": "seal",
+                    "trailing": {
+                      "button": "Copy SHA-1",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | hash:'sha1'" }
+                    }
+                  },
+                  {
+                    "cell": "MD5",
+                    "subtitle": "$input | hash:'md5'",
+                    "leading": "seal",
+                    "trailing": {
+                      "button": "Copy MD5",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | hash:'md5'" }
+                    }
+                  },
+                  {
+                    "cell": "SHA-512",
+                    "subtitle": "$input | hash:'sha512'",
+                    "leading": "checkmark.seal",
+                    "trailing": {
+                      "button": "Copy SHA-512",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "copy",
+                      "args": { "text": "$input | hash:'sha512'" }
+                    }
+                  }
+                ],
+                "style": "inset",
+                "when": "$mode | map:{hash:true, else:false}"
+              }
+            ],
+            "gap": "m",
+            "when": "$input"
+          },
+          {
+            "row": [
+              { "text": "{$input | count} characters", "size": "s", "emphasis": "subtle" },
+              { "spacer": true },
+              { "button": "Clear", "icon": "xmark.circle", "style": "secondary", "size": "s", "on": "clear", "when": "$input" }
+            ],
+            "align": "center"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": { "menubar": { "icon": "chevron.left.forwardslash.chevron.right", "card": "main" }, "floating": { "card": "main", "width": "default" } }
+}

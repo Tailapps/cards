@@ -1,0 +1,77 @@
+{
+  "schema": "tailapps/v0",
+  "app": "on-air",
+  "name": "On Air",
+  "description": "On air in the menu bar while any app uses your mic or camera, the app in front, time away, and recent calls. It only knows that something listens, never what. Mac only.",
+  "icon": "dot.radiowaves.left.and.right",
+  "version": 1,
+  "permissions": ["activity", "activity.apps"],
+  "sync": "never",
+  "sources": {
+    "mac": {
+      "activity": ["mic", "camera", "front_app", "idle"],
+      "on_change": { "action": "follow", "watch": "{$mac.mic} {$mac.camera}" }
+    }
+  },
+  "state": {
+    "on_air": { "type": "bool", "default": false },
+    "was": { "type": "bool", "default": false },
+    "calls": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "follow": {
+      "steps": [
+        { "set": { "was": "$on_air" } },
+        {
+          "if": "$mac.mic",
+          "then": [{ "set": { "on_air": true } }],
+          "else": [{ "if": "$mac.camera", "then": [{ "set": { "on_air": true } }], "else": [{ "set": { "on_air": false } }] }]
+        },
+        {
+          "if": "$on_air",
+          "then": [
+            { "if": "$was | map:{true:false, else:true}", "then": [{ "push": { "calls": { "at": "$now", "app": "$mac.front_app.name" } }, "max": 20 }] }
+          ]
+        }
+      ]
+    },
+    "clear": {
+      "steps": [{ "set": { "calls": [] } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "column": [
+              { "cell": "Microphone", "leading": "mic", "subtitle": "$mac.mic | map:{true:'In use', else:'Not in use'}", "status": "$mac.mic | map:{true:'bad', else:'neutral'}" },
+              { "cell": "Camera", "leading": "video", "subtitle": "$mac.camera | map:{true:'In use', else:'Not in use'}", "status": "$mac.camera | map:{true:'bad', else:'neutral'}" },
+              { "cell": "In front", "leading": "macwindow", "subtitle": "$mac.front_app.name | default:'—'" },
+              { "cell": "You", "leading": "person", "subtitle": "$mac.idle | map:{0:'Here', else:'Away'}", "trailing": "$mac.idle | duration" }
+            ],
+            "style": "inset"
+          },
+          {
+            "section": "Calls",
+            "trailing": { "button": "Clear", "on": "clear", "style": "plain" },
+            "when": "$calls",
+            "children": [
+              { "list": "$calls", "limit": 10, "item": { "cell": "$item.at | date:'short'", "subtitle": "In front: {$item.app}", "trailing": "$item.at | ago" } }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "dot.radiowaves.left.and.right",
+      "card": "main",
+      "label": "$on_air | map:{true:'On air', else:''}",
+      "label_tone": "$on_air | map:{true:'bad', else:'neutral'}"
+    }
+  }
+}

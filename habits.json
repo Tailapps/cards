@@ -1,0 +1,158 @@
+{
+  "schema": "tailapps/v0",
+  "app": "habits",
+  "name": "Habit",
+  "description": "One habit: tick it off each time, see the last 13 weeks, and how long it's been. To share one history between your Mac and iPhone, turn on \"Share ticks\" in its settings and Sync to My Devices on both.",
+  "icon": "checkmark.seal",
+  "version": 2,
+  "permissions": [
+    "inbox:done",
+    "send:done"
+  ],
+  "settings": {
+    "share": {
+      "type": "toggle",
+      "label": "Share ticks with my other devices",
+      "default": false
+    }
+  },
+  "sources": {
+    "ticks": {
+      "inbox": "done",
+      "on_receive": "received"
+    }
+  },
+  "state": {
+    "done": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "stat": "$done | count",
+                "label": "Times done",
+                "grow": true
+              },
+              {
+                "column": [
+                  {
+                    "timer": "$done.0.date",
+                    "mode": "since",
+                    "format": "short",
+                    "size": "l"
+                  },
+                  {
+                    "text": "since last time",
+                    "size": "xs",
+                    "emphasis": "subtle"
+                  }
+                ],
+                "gap": "xs",
+                "align": "end",
+                "when": "$done.0"
+              }
+            ],
+            "align": "center"
+          },
+          {
+            "heatmap": "$done",
+            "days": 91,
+            "hue": "green",
+            "start": "monday"
+          },
+          {
+            "button": "Done",
+            "on": "mark",
+            "style": "primary",
+            "keys": "mod+return"
+          },
+          {
+            "section": "History",
+            "collapsible": true,
+            "collapsed": true,
+            "children": [
+              {
+                "calendar": "$done",
+                "views": ["month", "year"],
+                "marks": "fill"
+              },
+              {
+                "list": "$done",
+                "limit": 5,
+                "style": "timeline",
+                "empty": "Nothing yet",
+                "item": {
+                  "text": "$item.date | date:'long'"
+                }
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "mark": {
+      "steps": [
+        {
+          "push": {
+            "done": {
+              "date": "$now",
+              "value": 1
+            }
+          },
+          "max": 400
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "done": {
+                  "date": "$now"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "received": {
+      "steps": [
+        {
+          "if": "$args.event.date",
+          "then": [
+            {
+              "push": {
+                "done": {
+                  "date": "$args.event.date",
+                  "value": 1
+                }
+              },
+              "max": 400
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "checkmark.seal",
+      "label": "{$done | count} done",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "narrow"
+    }
+  }
+}

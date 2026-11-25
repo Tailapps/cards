@@ -1,0 +1,581 @@
+{
+  "schema": "tailapps/v0",
+  "app": "claude-usage",
+  "name": "Claude usage",
+  "description": "Your Claude plan's 5-hour and weekly limits, plus tokens and an estimated API cost by day, project and model, from Claude Code on your Mac. Syncs only these numbers to your iPhone.",
+  "icon": "chart.bar",
+  "version": 2,
+  "permissions": [
+    "script:usage.sh",
+    "inbox:limits"
+  ],
+  "state": {
+    "report": {
+      "type": "object",
+      "default": {},
+      "sync": true
+    },
+    "plan": {
+      "type": "object",
+      "default": {},
+      "sync": true
+    },
+    "five": {
+      "type": "any",
+      "default": null
+    },
+    "week": {
+      "type": "any",
+      "default": null
+    },
+    "cost": {
+      "type": "any",
+      "default": null
+    },
+    "level": {
+      "type": "text",
+      "default": "none"
+    }
+  },
+  "sources": {
+    "usage": {
+      "script": "usage.sh",
+      "every": 300,
+      "on": "open",
+      "timeout": 240,
+      "platforms": [
+        "macos"
+      ],
+      "on_change": "publish"
+    },
+    "limits": {
+      "inbox": "limits",
+      "on_receive": "got_limits",
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "scripts": {
+    "usage.sh": "#!/bin/sh\n# Claude Code's token use for the last 7 days, read from its own logs (~/.claude/projects/**/*.jsonl).\n# Reads only, sends nothing. Prints one JSON object: today, week, days (for a chart), top projects and models.\n# Cost is an estimate at Anthropic API list prices (input, output, cache write = 1.25 x input, cache read);\n# on a Pro or Max plan nobody pays it, but it shows how much work the sessions did.\ndir=\"$HOME/.claude/projects\"\nif [ ! -d \"$dir\" ]; then\n  echo \"{\\\"found\\\":false,\\\"day\\\":\\\"$(date +%Y-%m-%d)\\\",\\\"today\\\":{\\\"tokens\\\":0,\\\"cost\\\":0},\\\"week\\\":{\\\"tokens\\\":0,\\\"cost\\\":0},\\\"days\\\":[],\\\"projects\\\":[],\\\"models\\\":[]}\"\n  exit 0\nfi\n# Files touched in the last 8 days; only lines that carry token counts go on to jq.\nfind \"$dir\" -type f -name '*.jsonl' -mtime -8 2>/dev/null | while IFS= read -r file; do\n  grep -F -h '\"output_tokens\"' \"$file\" 2>/dev/null\ndone | jq -R -c '\n  fromjson? | select(type == \"object\" and .type == \"assistant\" and (.message.usage | type) == \"object\")\n  | select((.message.model // \"\") != \"<synthetic>\")\n  | .message.usage as $u\n  | {\n      k: (if .message.id and .requestId then .message.id + \":\" + .requestId else \"line\" + (input_line_number | tostring) end),\n      t: ((.timestamp // \"\") | sub(\"\\\\.[0-9]+\"; \"\") | try fromdateiso8601 catch 0),\n      m: ((.message.model // \"unknown\") | sub(\"^claude-\"; \"\")),\n      p: ((.cwd // \"\") | split(\"/\") | map(select(. != \"\")) | last // \"unknown\"),\n      i: ($u.input_tokens // 0), o: ($u.output_tokens // 0),\n      w: ($u.cache_creation_input_tokens // 0), r: ($u.cache_read_input_tokens // 0)\n    }\n' | jq -s -c '\n  # $ per million tokens: [input, output, cache read]. Cache writes are 1.25 x input.\n  def price:\n    if test(\"fable-5-2|mythos-5-2\") then [8, 40, 0.2]\n    elif test(\"fable|mythos\") then [10, 50, 1]\n    elif test(\"opus-5-5\") then [4, 20, 0.2]\n    elif test(\"opus-5|opus-4-[5-9]\") then [5, 25, 0.5]\n    elif test(\"opus\") then [15, 75, 1.5]\n    elif test(\"sonnet-5-5\") then [2, 10, 0.1]\n    elif test(\"sonnet-5\") then [2, 10, 0.2]\n    elif test(\"haiku-5\") then [0.1, 0.5, 0.01]\n    elif test(\"haiku-4\") then [1, 5, 0.1]\n    elif test(\"haiku\") then [0.8, 4, 0.08]\n    else [3, 15, 0.3] end;\n  def cost: (.m | price) as $p | (.i * $p[0] + .w * $p[0] * 1.25 + .o * $p[1] + .r * $p[2]) / 1000000;\n  def tokens: .i + .o + .w + .r;\n  def total: { tokens: (map(tokens) | add // 0), cost: ((map(cost) | add // 0) * 10000 | round / 10000),\n               input: (map(.i) | add // 0), output: (map(.o) | add // 0), cache: (map(.w + .r) | add // 0), messages: length };\n  # The last 7 calendar days, counted from noon UTC on the local date of today, so a 23- or 25-hour day skips none.\n  ((now | strflocaltime(\"%Y-%m-%d\") | strptime(\"%Y-%m-%d\") | mktime) + 43200) as $noon\n  | [range(6; -1; -1) | ($noon - . * 86400)] as $stamps\n  | ($stamps | map(strftime(\"%Y-%m-%d\"))) as $week\n  | map(select(.t > 0) | . + { d: (.t | strflocaltime(\"%Y-%m-%d\")) } | select(.d as $d | $week | index($d)))\n  # Claude Code writes a line per content block of a reply, each with the usage so far: keep the fullest one.\n  | group_by(.k) | map(max_by(.o))\n  | . as $all\n  | ($week | last) as $today\n  | {\n      found: true,\n      day: $today,\n      today: ($all | map(select(.d == $today)) | total),\n      week: ($all | total),\n      days: [range(0; 7) as $n | { label: ($stamps[$n] | strftime(\"%a\")), value: ($all | map(select(.d == $week[$n]) | tokens) | add // 0) }],\n      projects: ($all | group_by(.p) | map({ name: .[0].p } + total | del(.input, .output, .cache, .messages)) | sort_by(-.cost) | .[0:5]),\n      models: ($all | group_by(.m) | map({ name: .[0].m } + total | del(.input, .output, .cache, .messages)) | sort_by(-.cost) | .[0:4])\n    }\n'\n"
+  },
+  "actions": {
+    "publish": {
+      "steps": [
+        {
+          "set": {
+            "report": "$args.value"
+          }
+        },
+        {
+          "set": {
+            "five": "$plan.five_hour.used_percentage",
+            "week": "$plan.seven_day.used_percentage",
+            "level": "none",
+            "cost": null
+          }
+        },
+        {
+          "if": "$plan.five_hour.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "five": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$plan.seven_day.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "week": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$level | map:{none:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "cost": "$report.today.cost"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "got_limits": {
+      "steps": [
+        {
+          "set": {
+            "plan": {
+              "five_hour": "$args.event.five_hour",
+              "seven_day": "$args.event.seven_day",
+              "at": "$now"
+            }
+          }
+        },
+        {
+          "set": {
+            "five": "$plan.five_hour.used_percentage",
+            "week": "$plan.seven_day.used_percentage",
+            "level": "none",
+            "cost": null
+          }
+        },
+        {
+          "if": "$plan.five_hour.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "five": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$plan.seven_day.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "week": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$level | map:{none:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "cost": "$report.today.cost"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "recalc": {
+      "steps": [
+        {
+          "set": {
+            "five": "$plan.five_hour.used_percentage",
+            "week": "$plan.seven_day.used_percentage",
+            "level": "none",
+            "cost": null
+          }
+        },
+        {
+          "if": "$plan.five_hour.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "five": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$plan.seven_day.resets_at | times:-1 | add:$now | tone:{bad:'>=0', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "week": null
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "level": "good"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=70', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "warn"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$five | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$week | tone:{bad:'>=90', else:'good'} | map:{bad:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "level": "bad"
+              }
+            }
+          ]
+        },
+        {
+          "if": "$level | map:{none:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "cost": "$report.today.cost"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "section": "Plan limits",
+            "children": [
+              {
+                "row": [
+                  {
+                    "text": "5 hours",
+                    "size": "s"
+                  },
+                  {
+                    "progress": "$five | times:0.01",
+                    "style": "bar",
+                    "tone": "$five | tone:{bad:'>=90', warn:'>=70', else:'good'}",
+                    "grow": true
+                  },
+                  {
+                    "text": "{$five | round}%",
+                    "size": "s",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "timer": "$plan.five_hour.resets_at",
+                    "mode": "until",
+                    "format": "short",
+                    "size": "s"
+                  }
+                ],
+                "align": "center",
+                "gap": "s",
+                "when": "$five | map:{null:false, else:true}"
+              },
+              {
+                "row": [
+                  {
+                    "text": "Week",
+                    "size": "s"
+                  },
+                  {
+                    "progress": "$week | times:0.01",
+                    "style": "bar",
+                    "tone": "$week | tone:{bad:'>=90', warn:'>=70', else:'good'}",
+                    "grow": true
+                  },
+                  {
+                    "text": "{$week | round}%",
+                    "size": "s",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "timer": "$plan.seven_day.resets_at",
+                    "mode": "until",
+                    "format": "short",
+                    "size": "s"
+                  }
+                ],
+                "align": "center",
+                "gap": "s",
+                "when": "$week | map:{null:false, else:true}"
+              },
+              {
+                "text": "From Claude Code's status line, checked {$plan.at | ago}. Each limit resets after the time on the right.",
+                "size": "xs",
+                "emphasis": "subtle",
+                "when": "$level | map:{none:false, else:true}"
+              },
+              {
+                "text": "Your plan's limits show once Claude Code's status line runs the TailApps script (/tailapps:claude-cards sets it up). Pro and Max plans only.",
+                "size": "xs",
+                "emphasis": "subtle",
+                "when": "$level | map:{none:true, else:false}"
+              }
+            ]
+          },
+          {
+            "section": "Estimated API cost",
+            "children": [
+              {
+                "grid": [
+                  {
+                    "stat": "$report.today.cost | currency:'USD':'full'",
+                    "label": "Today"
+                  },
+                  {
+                    "stat": "$report.week.cost | currency:'USD':'full'",
+                    "label": "Last 7 days"
+                  }
+                ],
+                "columns": 2
+              },
+              {
+                "chart": "$report.days",
+                "kind": "bar",
+                "height": "s",
+                "when": "$report.week.tokens"
+              },
+              {
+                "text": "{$report.today.tokens | compact} tokens today · {$report.week.tokens | compact} in 7 days",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$report.day"
+              },
+              {
+                "text": "No Claude Code logs in ~/.claude/projects on this Mac yet.",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$report.found | map:{false:true, else:false}"
+              },
+              {
+                "text": "Waiting for your Mac to read Claude Code's logs.",
+                "size": "s",
+                "emphasis": "subtle",
+                "when": "$report.day | map:{null:true, else:false}"
+              },
+              {
+                "text": "Estimated at API list prices; on a Pro or Max plan you don't pay this.",
+                "size": "xs",
+                "emphasis": "subtle",
+                "when": "$report.day"
+              },
+              {
+                "text": "Read {$meta.usage.updated | ago}",
+                "size": "xs",
+                "emphasis": "subtle",
+                "platforms": [
+                  "macos"
+                ],
+                "when": "$meta.usage.updated"
+              }
+            ]
+          },
+          {
+            "section": "Top projects",
+            "when": "$report.projects",
+            "children": [
+              {
+                "list": "$report.projects",
+                "limit": 5,
+                "item": {
+                  "cell": "$item.name",
+                  "subtitle": "{$item.tokens | compact} tokens",
+                  "trailing": "{$item.cost | currency:'USD':'full'}"
+                }
+              }
+            ]
+          },
+          {
+            "section": "Models",
+            "collapsible": true,
+            "collapsed": true,
+            "when": "$report.models",
+            "children": [
+              {
+                "list": "$report.models",
+                "limit": 4,
+                "item": {
+                  "cell": "$item.name",
+                  "subtitle": "{$item.tokens | compact} tokens",
+                  "trailing": "{$item.cost | currency:'USD':'full'}"
+                }
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "chart.bar",
+      "label": "{$five | map:{null:'', else:'5h '}}{$five | round}{$five | map:{null:'', else:'% '}}{$week | map:{null:'', else:'wk '}}{$week | round}{$week | map:{null:'', else:'%'}}{$cost | currency:'USD':'full'}{$cost | map:{null:'', else:' today'}}",
+      "label_icon": "chart.bar",
+      "in_menu": "row",
+      "card": "main",
+      "label_tone": "$level | tone:{good:'good', warn:'warn', bad:'bad', else:'neutral'}"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  },
+  "on_sync": "recalc",
+  "alarms": {
+    "five_hour_reset": {
+      "at": "$plan.five_hour.resets_at",
+      "action": "recalc"
+    },
+    "week_reset": {
+      "at": "$plan.seven_day.resets_at",
+      "action": "recalc"
+    }
+  }
+}

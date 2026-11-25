@@ -1,0 +1,61 @@
+{
+  "schema": "tailapps/v0",
+  "app": "counter",
+  "name": "Counter",
+  "description": "A shared tally: + and − on any of your devices. Turn on Sync to My Devices on each one and they stay in step.",
+  "icon": "plusminus",
+  "version": 1,
+  "permissions": ["inbox:count", "send:count"],
+  "state": {
+    "count": { "type": "number", "default": 0 }
+  },
+  "sources": {
+    "incoming": { "inbox": "count", "on_receive": "received" }
+  },
+  "actions": {
+    "plus": {
+      "steps": [
+        { "increment": { "count": 1 } },
+        { "send": { "count": { "value": "$count" } } }
+      ]
+    },
+    "minus": {
+      "steps": [
+        { "increment": { "count": -1 }, "min": 0 },
+        { "send": { "count": { "value": "$count" } } }
+      ]
+    },
+    "reset": {
+      "confirm": "Reset the count to 0 on every device?",
+      "steps": [
+        { "set": { "count": 0 } },
+        { "send": { "count": { "value": "$count" } } }
+      ]
+    },
+    "received": {
+      "steps": [
+        { "set": { "count": "$args.event.value" } }
+      ]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "row": [
+          { "button": "−", "on": "minus", "disabled": "$running.minus" },
+          { "spacer": true },
+          { "stat": "$count | number", "label": "Count", "size": "l" },
+          { "spacer": true },
+          { "button": "+", "on": "plus", "style": "primary", "disabled": "$running.plus" }
+        ], "align": "center" },
+        { "row": [{ "spacer": true }, { "button": "Reset", "on": "reset", "style": "plain" }] }
+      ],
+      "gap": "m"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "plusminus", "in_menu": "row", "label": "{$count}", "card": "main" },
+    "floating": { "card": "main", "width": "narrow" }
+  }
+}

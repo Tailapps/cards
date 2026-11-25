@@ -1,0 +1,219 @@
+{
+  "schema": "tailapps/v0",
+  "app": "todo",
+  "name": "To-do",
+  "description": "A to-do list: add with Return, tick to finish, see what's left at a glance, and clear what's done. With Sync to My Devices on, it's the same on your Mac and iPhone.",
+  "icon": "checklist",
+  "version": 2,
+  "permissions": [],
+  "state": {
+    "todos": {
+      "type": "list",
+      "sync": true,
+      "default": [
+        {
+          "id": "1",
+          "title": "Reply to the design review",
+          "note": "Before Friday",
+          "done": false,
+          "hue": "orange"
+        },
+        {
+          "id": "2",
+          "title": "Book the car service",
+          "note": "",
+          "done": false,
+          "hue": "blue"
+        },
+        {
+          "id": "3",
+          "title": "Send the March invoice",
+          "note": "",
+          "done": true,
+          "hue": "green"
+        },
+        {
+          "id": "4",
+          "title": "Water the plants",
+          "note": "",
+          "done": false,
+          "hue": "teal"
+        }
+      ]
+    },
+    "draft": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "actions": {
+    "add": {
+      "steps": [
+        {
+          "if": "$draft",
+          "then": [
+            {
+              "push": {
+                "todos": {
+                  "id": "{$now}-{$todos | count}",
+                  "title": "$draft",
+                  "note": "",
+                  "done": false,
+                  "hue": "blue"
+                }
+              },
+              "at": "end"
+            },
+            {
+              "set": {
+                "draft": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "tick": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "update": {
+            "todos": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "done": "$args.value"
+              }
+            }
+          }
+        },
+        {
+          "haptic": "selection"
+        }
+      ]
+    },
+    "remove_todo": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "remove": {
+            "todos": {
+              "match": {
+                "id": "$args.id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "clear_done": {
+      "confirm": "Clear the finished to-dos?",
+      "steps": [
+        {
+          "remove": {
+            "todos": {
+              "match": {
+                "done": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "progress": "$todos | share:'done'",
+            "label": "{$todos | where:'done' | count} of {$todos | count} done",
+            "percent": true,
+            "split": "$todos | count",
+            "size": "m",
+            "when": "$todos"
+          },
+          {
+            "field": "",
+            "type": "text",
+            "bind": "$draft",
+            "placeholder": "Add a to-do…",
+            "on_submit": "add"
+          },
+          {
+            "column": [
+              {
+                "list": "$todos",
+                "empty": "Nothing to do. Add one above.",
+                "item": {
+                  "cell": "$item.title",
+                  "subtitle": "$item.note",
+                  "check": "$item.done",
+                  "on_check": "tick",
+                  "check_hue": "$item.hue",
+                  "args": {
+                    "id": "$item.id"
+                  },
+                  "trailing": {
+                    "menu": "More for {$item.title}",
+                    "icon": "ellipsis",
+                    "icon_only": true,
+                    "items": [
+                      {
+                        "label": "Delete",
+                        "on": "remove_todo",
+                        "args": {
+                          "id": "$item.id"
+                        },
+                        "style": "destructive"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "style": "inset"
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          {
+            "text": "{$todos | where:{done:false} | count} left",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "spacer": true
+          },
+          {
+            "button": "Clear done",
+            "icon": "checkmark.circle",
+            "style": "plain",
+            "on": "clear_done",
+            "disabled": "$todos | where:'done' | count | map:{0:true, else:false}"
+          }
+        ],
+        "align": "center"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "checklist",
+      "label": "{$todos | where:{done:false} | count} left",
+      "in_menu": "card"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

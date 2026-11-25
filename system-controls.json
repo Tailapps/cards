@@ -1,0 +1,538 @@
+{
+  "schema": "tailapps/v0",
+  "app": "system-controls",
+  "name": "System Controls",
+  "description": "Sound, microphone, Wi-Fi, Bluetooth, network and power with a native control for every change, using the built-in system controls (no scripts). Mac only.",
+  "icon": "slider.horizontal.3",
+  "version": 1,
+  "permissions": [
+    "audio.read",
+    "audio.control",
+    "wifi.read",
+    "wifi.control",
+    "bluetooth.read",
+    "bluetooth.control",
+    "network.read",
+    "power.read",
+    "power.control"
+  ],
+  "state": {
+    "network_name": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "sources": {
+    "sound": {
+      "system": "audio"
+    },
+    "net": {
+      "system": "network"
+    },
+    "power": {
+      "system": "power"
+    },
+    "wifi": {
+      "system": "wifi"
+    },
+    "bt": {
+      "system": "bluetooth",
+      "every": 60
+    }
+  },
+  "actions": {
+    "set_volume": {
+      "steps": [
+        {
+          "audio.volume.set": "$args.value"
+        }
+      ]
+    },
+    "mute": { "expose": true,
+      "steps": [
+        {
+          "audio.mute": "toggle"
+        }
+      ]
+    },
+    "mic_mute": {
+      "steps": [
+        {
+          "audio.input.mute": "toggle"
+        }
+      ]
+    },
+    "set_output": {
+      "args": {
+        "device": "text"
+      },
+      "steps": [
+        {
+          "audio.output.set": "$args.device"
+        }
+      ]
+    },
+    "set_input": {
+      "args": {
+        "device": "text"
+      },
+      "steps": [
+        {
+          "audio.input.set": "$args.device"
+        }
+      ]
+    },
+    "wifi_toggle": {
+      "confirm": "Turn Wi-Fi on or off? You'll go offline while it's off.",
+      "steps": [
+        {
+          "wifi.power": "toggle"
+        }
+      ]
+    },
+    "wifi_join": {
+      "steps": [
+        {
+          "wifi.join": "$network_name"
+        },
+        {
+          "set": {
+            "network_name": ""
+          }
+        }
+      ]
+    },
+    "bt_connect": {
+      "args": {
+        "device": "text"
+      },
+      "steps": [
+        {
+          "bluetooth.connect": "$args.device"
+        },
+        {
+          "refresh": "bt"
+        }
+      ]
+    },
+    "bt_disconnect": {
+      "args": {
+        "device": "text"
+      },
+      "steps": [
+        {
+          "bluetooth.disconnect": "$args.device"
+        },
+        {
+          "refresh": "bt"
+        }
+      ]
+    },
+    "display_off": {
+      "steps": [
+        {
+          "display.sleep": {}
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "icon": "speaker.wave.2",
+                "tone": "neutral"
+              },
+              {
+                "text": "Sound",
+                "emphasis": "strong"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "badge": "$sound.muted | map:{true:'Muted', else:'On'}",
+                "tone": "$sound.muted | tone:{true:'warn', else:'good'}"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "field": "Volume",
+            "type": "slider",
+            "value": "$sound.volume",
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit": "%",
+            "on_change": "set_volume"
+          },
+          {
+            "row": [
+              {
+                "button": "$sound.muted | map:{true:'Unmute', else:'Mute'}",
+                "on": "mute"
+              },
+              {
+                "button": "$sound.input.muted | map:{true:'Mic on', else:'Mic off'}",
+                "on": "mic_mute"
+              }
+            ],
+            "gap": "s"
+          },
+          {
+            "row": [
+              {
+                "icon": "hifispeaker",
+                "tone": "neutral"
+              },
+              {
+                "text": "$sound.output.name",
+                "size": "s",
+                "lines": 1,
+                "grow": true
+              },
+              {
+                "menu": "Switch",
+                "items": "$sound.outputs",
+                "item": {
+                  "label": "$item.name",
+                  "on": "set_output",
+                  "args": {
+                    "device": "$item.id"
+                  }
+                }
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "row": [
+              {
+                "icon": "$sound.input.muted | map:{true:'mic.slash', else:'mic'}",
+                "tone": "neutral"
+              },
+              {
+                "text": "$sound.input.name",
+                "size": "s",
+                "lines": 1,
+                "grow": true
+              },
+              {
+                "menu": "Switch",
+                "items": "$sound.inputs",
+                "item": {
+                  "label": "$item.name",
+                  "on": "set_input",
+                  "args": {
+                    "device": "$item.id"
+                  }
+                }
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "divider": true
+          },
+          {
+            "row": [
+              {
+                "icon": "wifi",
+                "tone": "neutral"
+              },
+              {
+                "text": "Wi-Fi",
+                "emphasis": "strong"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "badge": "$wifi.on | map:{true:'On', else:'Off'}",
+                "tone": "$wifi.on | tone:{true:'good', else:'neutral'}"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "row": [
+              {
+                "text": "$wifi.network",
+                "emphasis": "strong",
+                "lines": 1,
+                "grow": true
+              },
+              {
+                "text": "{$wifi.quality}% · {$wifi.signal} dBm",
+                "size": "s",
+                "emphasis": "subtle"
+              }
+            ],
+            "gap": "s",
+            "align": "center",
+            "when": "$wifi.network"
+          },
+          {
+            "text": "Connected, but the name needs Location (TailApps asks once)",
+            "size": "s",
+            "tone": "warn",
+            "when": "$wifi.name_hidden"
+          },
+          {
+            "row": [
+              {
+                "field": "Network to join",
+                "bind": "$network_name",
+                "placeholder": "A network this Mac already knows",
+                "on_submit": "wifi_join",
+                "grow": true
+              },
+              {
+                "button": "Join",
+                "on": "wifi_join",
+                "disabled": "$network_name | map:{'':true, null:true, else:false}"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "button": "Turn Wi-Fi on/off",
+            "on": "wifi_toggle",
+            "style": "secondary"
+          },
+          {
+            "divider": true
+          },
+          {
+            "row": [
+              {
+                "icon": "point.3.connected.trianglepath.dotted",
+                "tone": "neutral"
+              },
+              {
+                "text": "Bluetooth",
+                "emphasis": "strong"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "badge": "$bt.on | map:{true:'On', else:'Off'}",
+                "tone": "$bt.on | tone:{true:'good', else:'neutral'}"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "list": "$bt.devices",
+            "empty": "No paired devices",
+            "limit": 8,
+            "item": {
+              "row": [
+                {
+                  "column": [
+                    {
+                      "text": "$item.name",
+                      "lines": 1
+                    },
+                    {
+                      "text": "{$item.kind | default:'Device'}{$item.connected | map:{true:' · Connected', else:''}}",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "tone": "$item.connected | tone:{true:'good', else:'neutral'}",
+                      "lines": 1
+                    }
+                  ],
+                  "gap": "xs",
+                  "grow": true
+                },
+                {
+                  "text": "{$item.battery}%",
+                  "size": "s",
+                  "emphasis": "subtle",
+                  "when": "$item.battery"
+                },
+                {
+                  "button": "Disconnect",
+                  "on": "bt_disconnect",
+                  "args": {
+                    "device": "$item.id"
+                  },
+                  "style": "plain",
+                  "when": "$item.connected"
+                },
+                {
+                  "button": "Connect",
+                  "on": "bt_connect",
+                  "args": {
+                    "device": "$item.id"
+                  },
+                  "style": "plain",
+                  "when": "$item.connected | map:{true:false, else:true}"
+                }
+              ],
+              "align": "center",
+              "gap": "s"
+            }
+          },
+          {
+            "text": "Point at a device for Connect or Disconnect",
+            "size": "s",
+            "emphasis": "subtle",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$bt.devices | count"
+          },
+          {
+            "divider": true
+          },
+          {
+            "row": [
+              {
+                "icon": "network",
+                "tone": "neutral"
+              },
+              {
+                "text": "Network",
+                "emphasis": "strong"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "badge": "$net.online | map:{true:'Online', else:'Offline'}",
+                "tone": "$net.online | tone:{true:'good', else:'bad'}"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "text": "Over {$net.interface | map:{wifi:'Wi-Fi', ethernet:'a cable', cellular:'a phone', else:'another link'}}{$net.expensive | map:{true:' (metered)', else:''}}",
+            "size": "s",
+            "when": "$net.online"
+          },
+          {
+            "divider": true
+          },
+          {
+            "row": [
+              {
+                "icon": "$power.status | map:{charging:'battery.100.bolt', plugged_in:'powerplug', else:'battery.75'}",
+                "tone": "neutral"
+              },
+              {
+                "text": "Power",
+                "emphasis": "strong"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "badge": "Low Power Mode",
+                "tone": "warn",
+                "when": "$power.low_power"
+              }
+            ],
+            "gap": "s",
+            "align": "center"
+          },
+          {
+            "row": [
+              {
+                "gauge": "$power.battery",
+                "max": 100,
+                "unit": "%",
+                "size": "m",
+                "tone": "$power.battery | tone:{bad:'<20', warn:'<40', else:'good'}",
+                "label": "Battery"
+              },
+              {
+                "column": [
+                  {
+                    "text": "$power.status | map:{charging:'Charging', plugged_in:'Plugged in', else:'On battery'}",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "text": "{$power.time_left | duration} {$power.charging | map:{true:'to full', else:'left'}}",
+                    "size": "s",
+                    "when": "$power.time_left"
+                  },
+                  {
+                    "column": [
+                      {
+                        "text": "Working out time left…",
+                        "size": "s",
+                        "emphasis": "subtle",
+                        "when": "$power.time_left | map:{null:true, else:false}"
+                      }
+                    ],
+                    "when": "$power.status | map:{plugged_in:false, else:true}"
+                  },
+                  {
+                    "text": "{$power.cycles} cycles{$power.health | map:{null:'', else:' · '}}{$power.health}{$power.health | map:{null:'', else:'% health'}}",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$power.cycles | map:{null:false, else:true}"
+                  },
+                  {
+                    "text": "Heat: {$power.thermal | map:{nominal:'normal', fair:'warm', serious:'hot', critical:'very hot'}}",
+                    "size": "s",
+                    "emphasis": "subtle"
+                  }
+                ],
+                "gap": "xs",
+                "grow": true
+              }
+            ],
+            "gap": "m",
+            "align": "start",
+            "when": "$power.has_battery"
+          },
+          {
+            "text": "No battery: on mains power",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$power.has_battery | map:{true:false, else:true}"
+          },
+          {
+            "row": [
+              {
+                "spacer": true
+              },
+              {
+                "button": "Turn display off",
+                "on": "display_off",
+                "style": "secondary"
+              }
+            ]
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "slider.horizontal.3",
+      "label": "{$sound.volume}%",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

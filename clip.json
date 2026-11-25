@@ -1,0 +1,192 @@
+{
+  "schema": "tailapps/v0",
+  "app": "clip",
+  "name": "Clip",
+  "description": "Record a short video, watch it, then share it or upload it to your own bucket (Cloudflare R2, S3 and others) and copy the link. Works on a Mac and on an iPhone.",
+  "icon": "video",
+  "permissions": [
+    "camera",
+    "mic.record",
+    "share",
+    "files.write:dest",
+    "clipboard.write"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Upload clips to",
+      "allow": [
+        "s3"
+      ]
+    }
+  },
+  "state": {
+    "clip": {
+      "type": "text",
+      "default": ""
+    },
+    "seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "clips": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "button": "Record",
+            "icon": "video",
+            "on": "record",
+            "style": "primary",
+            "size": "l",
+            "grow": true,
+            "disabled": "$running.upload"
+          },
+          {
+            "player": "$clip",
+            "height": "l",
+            "when": "$clip"
+          },
+          {
+            "row": [
+              {
+                "text": "$seconds | duration:'clock'",
+                "size": "s",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Share…",
+                "icon": "square.and.arrow.up",
+                "on": "share_clip",
+                "style": "secondary"
+              },
+              {
+                "button": "Upload",
+                "icon": "icloud.and.arrow.up",
+                "on": "upload",
+                "disabled": "$running.upload"
+              }
+            ],
+            "align": "center",
+            "when": "$clip"
+          },
+          {
+            "list": "$clips",
+            "limit": 10,
+            "item": {
+              "cell": "$item.at | ago",
+              "subtitle": "$item.seconds | duration:'clock'",
+              "leading": "film",
+              "accessory": "none",
+              "trailing": {
+                "button": "Copy link",
+                "icon": "link",
+                "icon_only": true,
+                "on": "copy",
+                "args": {
+                  "url": "$item.url"
+                }
+              }
+            },
+            "when": "$clips"
+          },
+          {
+            "text": "Clips stay on this device for a day unless you share or upload them. Uploads go straight to your bucket: choose it in ⋯ › Settings.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$clips | count | map:{0:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "record": {
+      "steps": [
+        {
+          "camera.take": {
+            "mode": "video",
+            "max_seconds": 60
+          },
+          "as": "taken"
+        },
+        {
+          "set": {
+            "clip": "$taken.path",
+            "seconds": "$taken.seconds"
+          }
+        }
+      ]
+    },
+    "share_clip": {
+      "steps": [
+        {
+          "share": {
+            "file": "$clip"
+          }
+        }
+      ]
+    },
+    "upload": {
+      "timeout": 900,
+      "steps": [
+        {
+          "files.save": {
+            "data": "$clip",
+            "to": "$settings.dest",
+            "name": "clip-{$now}.mp4"
+          },
+          "as": "saved"
+        },
+        {
+          "push": {
+            "clips": {
+              "url": "$saved.url",
+              "seconds": "$seconds",
+              "at": "$now"
+            }
+          },
+          "max": 30
+        },
+        {
+          "clipboard.write": {
+            "text": "$saved.url"
+          }
+        },
+        {
+          "set": {
+            "clip": "",
+            "seconds": 0
+          }
+        }
+      ]
+    },
+    "copy": {
+      "args": {
+        "url": "text"
+      },
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$args.url"
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "video",
+      "label": "{$clips | count} clips",
+      "card": "main"
+    }
+  }
+}

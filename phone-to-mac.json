@@ -1,0 +1,322 @@
+{
+  "schema": "tailapps/v0",
+  "app": "phone-to-mac",
+  "name": "Phone to Mac",
+  "description": "Send a photo or a file from your iPhone to your Mac: it lands in a folder you choose and shows in the card.",
+  "icon": "iphone.and.arrow.forward",
+  "permissions": [
+    "camera",
+    "inbox:files",
+    "send:files",
+    "files.write:dest",
+    "clipboard.write"
+  ],
+  "settings": {
+    "dest": {
+      "type": "folder",
+      "label": "Save files to",
+      "default": "~/Downloads/From iPhone",
+      "create": true,
+      "required": true,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "sources": {
+    "incoming": {
+      "inbox": "files",
+      "on_receive": "got_file"
+    }
+  },
+  "state": {
+    "files": {
+      "type": "list",
+      "default": []
+    },
+    "photos": {
+      "type": "list",
+      "default": []
+    },
+    "sent": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "gallery": "$photos",
+            "limit": 6,
+            "height": "m",
+            "thumb": "$item.thumb",
+            "on_select": "copy_photo",
+            "when": "$photos"
+          },
+          {
+            "text": "Click a photo to copy it.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$photos"
+          },
+          {
+            "list": "$files",
+            "limit": 5,
+            "item": {
+              "row": [
+                {
+                  "text": "$item.name",
+                  "grow": true,
+                  "lines": 1
+                },
+                {
+                  "text": "$item.at | ago",
+                  "size": "s",
+                  "emphasis": "subtle"
+                }
+              ]
+            },
+            "when": "$files"
+          },
+          {
+            "text": "Photos and files you send from TailApps on your iPhone land here and in your Save files to folder. Turn on Sync to My Devices for this card on both.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$files | count | map:{0:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "phone",
+      "layout": {
+        "column": [
+          {
+            "button": "Take Photo",
+            "on": "snap",
+            "style": "primary",
+            "size": "l",
+            "grow": true,
+            "icon": "camera",
+            "disabled": "$running.snap"
+          },
+          {
+            "button": "Choose Photo",
+            "on": "choose_photo",
+            "style": "secondary",
+            "size": "l",
+            "grow": true,
+            "icon": "photo.on.rectangle",
+            "disabled": "$running.choose_photo"
+          },
+          {
+            "button": "Choose File",
+            "on": "choose_file",
+            "style": "secondary",
+            "size": "l",
+            "grow": true,
+            "icon": "doc",
+            "disabled": "$running.choose_file"
+          },
+          {
+            "list": "$sent",
+            "limit": 5,
+            "item": {
+              "row": [
+                {
+                  "text": "$item.name",
+                  "grow": true,
+                  "lines": 1
+                },
+                {
+                  "text": "$item.delivered | map:{0:'Not delivered', else:'Sent'}",
+                  "size": "s",
+                  "tone": "$item.delivered | tone:{warn:'<1', else:'good'}"
+                }
+              ]
+            },
+            "when": "$sent"
+          },
+          {
+            "text": "Not delivered means no Mac has this card with Sync to My Devices on.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$sent"
+          },
+          {
+            "text": "Each photo or file goes to this card on your Mac, up to 10 MB. Turn on Sync to My Devices for it here and on the Mac.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$sent | count | map:{0:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "snap": {
+      "runs_on": [
+        "ios"
+      ],
+      "steps": [
+        {
+          "camera.take": {},
+          "as": "p"
+        },
+        {
+          "send": {
+            "files": {
+              "name": "$p.name",
+              "kind": "$p.kind",
+              "at": "$now"
+            }
+          },
+          "file": "$p.path",
+          "as": "out"
+        },
+        {
+          "push": {
+            "sent": {
+              "name": "$p.name",
+              "delivered": "$out.delivered",
+              "at": "$now"
+            }
+          },
+          "max": 20
+        }
+      ]
+    },
+    "choose_photo": {
+      "runs_on": [
+        "ios"
+      ],
+      "steps": [
+        {
+          "photos.pick": {},
+          "as": "p"
+        },
+        {
+          "send": {
+            "files": {
+              "name": "$p.name",
+              "kind": "$p.kind",
+              "at": "$now"
+            }
+          },
+          "file": "$p.path",
+          "as": "out"
+        },
+        {
+          "push": {
+            "sent": {
+              "name": "$p.name",
+              "delivered": "$out.delivered",
+              "at": "$now"
+            }
+          },
+          "max": 20
+        }
+      ]
+    },
+    "choose_file": {
+      "runs_on": [
+        "ios"
+      ],
+      "steps": [
+        {
+          "files.pick": {
+            "max_mb": 10
+          },
+          "as": "p"
+        },
+        {
+          "send": {
+            "files": {
+              "name": "$p.name",
+              "kind": "$p.kind",
+              "at": "$now"
+            }
+          },
+          "file": "$p.path",
+          "as": "out"
+        },
+        {
+          "push": {
+            "sent": {
+              "name": "$p.name",
+              "delivered": "$out.delivered",
+              "at": "$now"
+            }
+          },
+          "max": 20
+        }
+      ]
+    },
+    "got_file": {
+      "steps": [
+        {
+          "if": "$args.file",
+          "then": [
+            {
+              "files.save": {
+                "data": "$args.file",
+                "to": "$settings.dest",
+                "name": "$args.event.name"
+              },
+              "as": "saved"
+            },
+            {
+              "push": {
+                "files": {
+                  "name": "$args.event.name",
+                  "path": "$saved",
+                  "from": "$args.from",
+                  "at": "$args.event.at"
+                }
+              },
+              "max": 30
+            },
+            {
+              "if": "$args.event.kind | map:{image:true, else:false}",
+              "then": [
+                {
+                  "push": {
+                    "photos": {
+                      "thumb": "$saved",
+                      "name": "$args.event.name"
+                    }
+                  },
+                  "max": 12
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "copy_photo": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "image": "$args.item.thumb"
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "iphone.and.arrow.forward",
+      "label": "{$files | count} from iPhone",
+      "card": "main"
+    },
+    "phone": {
+      "card": "phone"
+    }
+  }
+}

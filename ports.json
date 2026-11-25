@@ -1,0 +1,107 @@
+{
+  "schema": "tailapps/v0",
+  "app": "ports",
+  "name": "Ports",
+  "description": "What is listening on this computer's TCP ports, with a Kill button. A tool for this computer only, so it doesn't sync.",
+  "icon": "network",
+  "permissions": [
+    "script:ports.sh",
+    "script:kill-port.sh"
+  ],
+  "scripts": {
+    "ports.sh": "#!/bin/sh\n# Listening TCP ports as JSON: [{\"port\":5432,\"command\":\"postgres\",\"pid\":812}, …]\n# TailApps' own process ($TAILAPPS_PID) is left out: apps can't stop TailApps.\n# lsof on a Mac (and on Linux when it's installed), else ss on Linux, which only names your own processes.\nlsof=/usr/sbin/lsof\n[ -x \"$lsof\" ] || lsof=$(command -v lsof)\nif [ -n \"$lsof\" ]; then\n  \"$lsof\" -nP -iTCP -sTCP:LISTEN -F pcn 2>/dev/null | awk -v self=\"$TAILAPPS_PID\" '\n  /^p/ { pid = substr($0, 2); skip = (pid == self) }\n  /^c/ { cmd = substr($0, 2); gsub(/[\"\\\\]/, \"\", cmd) }\n  /^n/ && !skip {\n    port = substr($0, 2); sub(/.*:/, \"\", port)\n    key = pid \":\" port\n    if (!(key in seen)) {\n      seen[key] = 1\n      printf \"%s{\\\"port\\\":%s,\\\"command\\\":\\\"%s\\\",\\\"pid\\\":%s}\", (count++ ? \",\" : \"[\"), port, cmd, pid\n    }\n  }\n  END { print (count ? \"]\" : \"[]\") }'\nelif command -v ss >/dev/null 2>&1; then\n  ss -Hltnp 2>/dev/null | awk -v self=\"$TAILAPPS_PID\" '\n  {\n    port = $4; sub(/.*:/, \"\", port)\n    cmd = \"\"; pid = 0\n    if (match($0, /users:\\(\\(\"[^\"]*\",pid=[0-9]+/)) {\n      s = substr($0, RSTART + 9, RLENGTH - 9); cmd = s; sub(/\".*/, \"\", cmd); pid = s; sub(/.*pid=/, \"\", pid)\n      gsub(/[\"\\\\]/, \"\", cmd)\n    }\n    if (pid == self && pid != 0) next\n    key = pid \":\" port\n    if (!(key in seen)) {\n      seen[key] = 1\n      printf \"%s{\\\"port\\\":%s,\\\"command\\\":\\\"%s\\\",\\\"pid\\\":%s}\", (count++ ? \",\" : \"[\"), port, (cmd == \"\" ? \"?\" : cmd), pid\n    }\n  }\n  END { print (count ? \"]\" : \"[]\") }'\nelse\n  echo \"Needs lsof or ss to list ports\" >&2\n  exit 1\nfi\n",
+    "kill-port.sh": "#!/bin/sh\n# Stop whatever is listening on TCP port $1 (lsof on a Mac, lsof or ss on Linux)\ncase \"$1\" in ''|*[!0-9]*) echo \"Not a port: $1\" >&2; exit 1 ;; esac\nlsof=/usr/sbin/lsof\n[ -x \"$lsof\" ] || lsof=$(command -v lsof)\nif [ -n \"$lsof\" ]; then\n  pids=$(\"$lsof\" -t -nP -iTCP:\"$1\" -sTCP:LISTEN | grep -vx \"$TAILAPPS_PID\")\nelif command -v ss >/dev/null 2>&1; then\n  pids=$(ss -Hltnp \"sport = :$1\" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u | grep -vx \"$TAILAPPS_PID\")\nelse\n  echo \"Needs lsof or ss to stop a port\" >&2\n  exit 1\nfi\nif [ -z \"$pids\" ]; then\n  echo \"Nothing you can stop is listening on port $1\" >&2\n  exit 1\nfi\nkill $pids\n"
+  },
+  "state": {
+    "ports": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "sources": {
+    "ports": {
+      "script": "ports.sh",
+      "every": 10,
+      "on": "open"
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "list": "$ports",
+            "empty": "Nothing is listening",
+            "item": {
+              "row": [
+                {
+                  "text": "$item.port",
+                  "mono": true,
+                  "emphasis": "strong"
+                },
+                {
+                  "text": "$item.command",
+                  "grow": true
+                },
+                {
+                  "text": "$item.pid",
+                  "mono": true,
+                  "size": "s",
+                  "emphasis": "subtle"
+                },
+                {
+                  "button": "Kill",
+                  "on": "kill",
+                  "args": {
+                    "port": "$item.port"
+                  },
+                  "style": "destructive",
+                  "disabled": "$running.kill"
+                }
+              ],
+              "align": "center",
+              "gap": "s"
+            }
+          },
+          {
+            "text": "{$ports | count} listening · updated {$meta.ports.updated | ago}",
+            "size": "xs",
+            "emphasis": "subtle"
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "actions": {
+    "kill": {
+      "args": {
+        "port": "int:1-65535"
+      },
+      "confirm": "Kill whatever is on port {$args.port}?",
+      "steps": [
+        {
+          "script": "kill-port.sh",
+          "args": [
+            "$args.port"
+          ]
+        },
+        {
+          "refresh": "ports"
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "network",
+      "label": "{$ports | count} listening",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

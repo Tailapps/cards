@@ -1,0 +1,83 @@
+{
+  "schema": "tailapps/v0",
+  "app": "tray",
+  "name": "File Tray",
+  "description": "A shelf for files: drop them on it, then drag one or all of them out to Finder or any app on your Mac, or share them from your iPhone. Files stay a day.",
+  "icon": "tray",
+  "version": 1,
+  "permissions": ["share"],
+  "settings": {
+    "clear_on_drag": { "type": "toggle", "label": "Take a file off the tray once it's dragged out", "default": true }
+  },
+  "state": {
+    "tray": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "add": {
+      "steps": [
+        { "each": "$args.files", "do": [{ "push": { "tray": "$item" }, "max": 50 }], "max": 100 }
+      ]
+    },
+    "took": {
+      "steps": [
+        { "if": "$settings.clear_on_drag", "then": [{ "remove": { "tray": { "match": { "path": "$args.item.path" } } } }] }
+      ]
+    },
+    "took_all": {
+      "steps": [{ "if": "$settings.clear_on_drag", "then": [{ "set": { "tray": [] } }] }]
+    },
+    "share_one": {
+      "args": { "path": "text" },
+      "steps": [{ "share": { "file": "$args.path" } }]
+    },
+    "drop_one": {
+      "args": { "path": "text" },
+      "steps": [{ "remove": { "tray": { "match": { "path": "$args.path" } } } }]
+    },
+    "clear": {
+      "steps": [{ "set": { "tray": [] } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "drop": "Drop files here", "multiple": true, "max": 50, "size": "s", "on": "add" },
+          {
+            "column": [{
+            "list": "$tray",
+            "limit": 50,
+            "empty": "Nothing on the tray.",
+            "item": {
+              "cell": "$item.name",
+              "subtitle": "{$item.size | bytes} · {$item.modified | ago}",
+              "leading": "doc",
+              "drag": "$item.path",
+              "on_dragged": "took",
+              "context_menu": [
+                { "label": "Share…", "icon": "square.and.arrow.up", "on": "share_one", "args": { "path": "$item.path" } },
+                { "label": "Remove", "icon": "xmark", "on": "drop_one", "args": { "path": "$item.path" } }
+              ]
+            }
+            }],
+            "style": "inset"
+          },
+          {
+            "row": [
+              { "badge": "Drag all", "tone": "accent", "drag": { "files": "$tray" }, "on_dragged": "took_all", "platforms": ["macos"] },
+              { "spacer": true },
+              { "button": "Clear", "on": "clear", "style": "plain" }
+            ],
+            "align": "center",
+            "when": "$tray"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "icon": "tray", "card": "main" }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema": "tailapps/v0",
+  "app": "scanner",
+  "name": "Scanner",
+  "description": "Scan QR codes and barcodes with the camera and keep the last twenty, ready to copy. On the iPhone and the Mac, with no script.",
+  "icon": "qrcode.viewfinder",
+  "version": 1,
+  "permissions": ["camera", "clipboard.write"],
+  "state": {
+    "codes": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "scan": {
+      "steps": [
+        { "scan.code": {}, "as": "code" },
+        { "remove": { "codes": { "match": { "value": "$code.value" } } } },
+        { "push": { "codes": { "type": "$code.type", "value": "$code.value", "at": "$now" } }, "at": "front", "max": 20 }
+      ]
+    },
+    "copy": {
+      "args": { "value": "text" },
+      "steps": [{ "clipboard.write": { "text": "$args.value" } }]
+    },
+    "clear": {
+      "confirm": "Forget every scanned code?",
+      "steps": [{ "set": { "codes": [] } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "button": "Scan a Code", "on": "scan", "style": "primary", "icon": "qrcode.viewfinder", "size": "l", "grow": true },
+          {
+            "column": [
+              {
+                "list": "$codes",
+                "item": {
+                  "cell": "$item.value",
+                  "subtitle": "{$item.type | upper} · {$item.at | ago}",
+                  "leading": "$item.type | map:{qr:'qrcode', else:'barcode'}",
+                  "trailing": { "button": "Copy", "on": "copy", "args": { "value": "$item.value" }, "icon": "doc.on.doc", "icon_only": true }
+                }
+              }
+            ],
+            "style": "inset",
+            "when": "$codes | count"
+          },
+          { "button": "Clear", "on": "clear", "style": "secondary", "when": "$codes | count" }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "icon": "qrcode.viewfinder", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

@@ -1,0 +1,926 @@
+{
+  "schema": "tailapps/v0",
+  "app": "pomodoro",
+  "name": "Pomodoro",
+  "description": "A focus timer with short and long breaks and a notification when each ends, on your Mac or iPhone. To share one timer, turn on \"Share the timer\" on each device, then Sync to My Devices.",
+  "icon": "timer",
+  "version": 5,
+  "permissions": [
+    "notify",
+    "inbox:timer",
+    "send:timer",
+    "send:focus-light/focus"
+  ],
+  "state": {
+    "phase": {
+      "type": "text",
+      "default": "work"
+    },
+    "status": {
+      "type": "text",
+      "default": "idle"
+    },
+    "ends_at": {
+      "type": "number",
+      "default": 0
+    },
+    "started_at": {
+      "type": "number",
+      "default": 0
+    },
+    "length": {
+      "type": "number",
+      "default": 1500
+    },
+    "left": {
+      "type": "any",
+      "default": null
+    },
+    "sessions": {
+      "type": "number",
+      "default": 0
+    },
+    "to_long": {
+      "type": "number",
+      "default": 4
+    },
+    "work_len": {
+      "type": "number",
+      "default": 1500
+    },
+    "short_len": {
+      "type": "number",
+      "default": 300
+    },
+    "long_len": {
+      "type": "number",
+      "default": 900
+    },
+    "long_after": {
+      "type": "number",
+      "default": 4
+    },
+    "auto": {
+      "type": "bool",
+      "default": true
+    }
+  },
+  "sources": {
+    "incoming": {
+      "inbox": "timer",
+      "on_receive": "heard"
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "badge": "$phase | map:{work:'Focus', short:'Short break', long:'Long break'}",
+                "tone": "$phase | map:{work:'accent', else:'good'}"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "text": "{$sessions} of {$long_after} focus sessions",
+                "size": "s",
+                "emphasis": "subtle"
+              }
+            ],
+            "align": "center"
+          },
+          {
+            "row": [
+              {
+                "progress": "$ends_at",
+                "from": "$started_at",
+                "style": "ring",
+                "size": "l",
+                "tone": "$phase | map:{work:'accent', else:'good'}",
+                "when": "$status | map:{running:true, else:false}"
+              },
+              {
+                "progress": 0,
+                "style": "ring",
+                "size": "l",
+                "tone": "neutral",
+                "when": "$status | map:{running:false, else:true}"
+              },
+              {
+                "column": [
+                  {
+                    "column": [
+                      {
+                        "timer": "$ends_at",
+                        "mode": "until",
+                        "size": "xl",
+                        "on_end": "phase_over"
+                      },
+                      {
+                        "text": "Left",
+                        "size": "s",
+                        "emphasis": "subtle"
+                      }
+                    ],
+                    "gap": "xs",
+                    "when": "$status | map:{running:true, else:false}"
+                  },
+                  {
+                    "stat": "$left | duration",
+                    "label": "Paused",
+                    "size": "xl",
+                    "when": "$status | map:{paused:true, else:false}"
+                  },
+                  {
+                    "column": [
+                      {
+                        "stat": "$work_len | duration",
+                        "label": "Ready",
+                        "size": "xl",
+                        "when": "$phase | map:{work:true, else:false}"
+                      },
+                      {
+                        "stat": "$short_len | duration",
+                        "label": "Ready",
+                        "size": "xl",
+                        "when": "$phase | map:{short:true, else:false}"
+                      },
+                      {
+                        "stat": "$long_len | duration",
+                        "label": "Ready",
+                        "size": "xl",
+                        "when": "$phase | map:{long:true, else:false}"
+                      }
+                    ],
+                    "when": "$status | map:{idle:true, else:false}"
+                  }
+                ],
+                "gap": "xs",
+                "grow": true
+              }
+            ],
+            "align": "center",
+            "gap": "m"
+          },
+          {
+            "row": [
+              {
+                "button": "Start",
+                "on": "start",
+                "style": "primary",
+                "keys": "mod+return",
+                "when": "$status | map:{idle:true, else:false}"
+              },
+              {
+                "button": "Resume",
+                "on": "start",
+                "style": "primary",
+                "keys": "mod+return",
+                "when": "$status | map:{paused:true, else:false}"
+              },
+              {
+                "button": "Pause",
+                "on": "pause",
+                "style": "primary",
+                "keys": "mod+return",
+                "when": "$status | map:{running:true, else:false}"
+              },
+              {
+                "button": "Reset",
+                "on": "reset",
+                "style": "secondary",
+                "disabled": "$status | map:{idle:true, else:false}"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "button": "Skip",
+                "on": "skip",
+                "style": "plain"
+              }
+            ],
+            "align": "center",
+            "gap": "s"
+          },
+          {
+            "section": "Times",
+            "collapsible": true,
+            "collapsed": true,
+            "children": [
+              {
+                "field": "Focus",
+                "type": "slider",
+                "bind": "$work_len",
+                "min": 300,
+                "max": 5400,
+                "step": 300,
+                "format": "duration"
+              },
+              {
+                "field": "Short break",
+                "type": "slider",
+                "bind": "$short_len",
+                "min": 60,
+                "max": 1800,
+                "step": 60,
+                "format": "duration"
+              },
+              {
+                "field": "Long break",
+                "type": "slider",
+                "bind": "$long_len",
+                "min": 300,
+                "max": 3600,
+                "step": 300,
+                "format": "duration"
+              },
+              {
+                "field": "Long break after (focus sessions)",
+                "type": "slider",
+                "bind": "$long_after",
+                "min": 2,
+                "max": 8,
+                "step": 1,
+                "on_change": "every_changed"
+              },
+              {
+                "field": "Start the next one by itself",
+                "type": "toggle",
+                "bind": "$auto"
+              },
+              {
+                "button": "Start over from session 1",
+                "on": "restart",
+                "style": "plain",
+                "confirm": "Stop the timer and start over from the first focus session?"
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "start": {
+      "steps": [
+        {
+          "if": "$status | map:{paused:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "ends_at": "$now",
+                "started_at": "$now",
+                "status": "running"
+              }
+            },
+            {
+              "increment": {
+                "ends_at": "$left",
+                "started_at": "$left"
+              }
+            },
+            {
+              "increment": {
+                "started_at": "-$length"
+              }
+            },
+            {
+              "set": {
+                "left": null
+              }
+            }
+          ],
+          "else": [
+            {
+              "set": {
+                "started_at": "$now",
+                "ends_at": "$now",
+                "length": 0,
+                "left": null,
+                "status": "running"
+              }
+            },
+            {
+              "if": "$phase | map:{work:true, else:false}",
+              "then": [
+                {
+                  "increment": {
+                    "ends_at": "$work_len",
+                    "length": "$work_len"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "$phase | map:{short:true, else:false}",
+              "then": [
+                {
+                  "increment": {
+                    "ends_at": "$short_len",
+                    "length": "$short_len"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "$phase | map:{long:true, else:false}",
+              "then": [
+                {
+                  "increment": {
+                    "ends_at": "$long_len",
+                    "length": "$long_len"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": "$settings.focus_light",
+          "then": [
+            {
+              "send": {
+                "focus": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at"
+                }
+              },
+              "app": "focus-light"
+            }
+          ]
+        }
+      ]
+    },
+    "pause": {
+      "steps": [
+        {
+          "if": "$status | map:{running:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "left": "$ends_at"
+              }
+            },
+            {
+              "increment": {
+                "left": "-$now"
+              },
+              "min": 0
+            },
+            {
+              "if": "$left | map:{0:true, else:false}",
+              "then": [
+                {
+                  "if": "$phase | map:{work:true, else:false}",
+                  "then": [
+                    {
+                      "increment": {
+                        "sessions": 1,
+                        "to_long": -1
+                      },
+                      "min": 0
+                    },
+                    {
+                      "if": "$to_long | map:{0:true, else:false}",
+                      "then": [
+                        {
+                          "set": {
+                            "phase": "long"
+                          }
+                        }
+                      ],
+                      "else": [
+                        {
+                          "set": {
+                            "phase": "short"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "if": "$phase | map:{long:true, else:false}",
+                      "then": [
+                        {
+                          "set": {
+                            "sessions": 0,
+                            "to_long": "$long_after"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "set": {
+                        "phase": "work"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "set": {
+                    "ends_at": 0,
+                    "left": null,
+                    "status": "idle"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "set": {
+                    "ends_at": 0,
+                    "status": "paused"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": "$settings.focus_light",
+          "then": [
+            {
+              "send": {
+                "focus": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at"
+                }
+              },
+              "app": "focus-light"
+            }
+          ]
+        }
+      ]
+    },
+    "reset": {
+      "steps": [
+        {
+          "set": {
+            "ends_at": 0,
+            "left": null,
+            "status": "idle"
+          }
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": "$settings.focus_light",
+          "then": [
+            {
+              "send": {
+                "focus": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at"
+                }
+              },
+              "app": "focus-light"
+            }
+          ]
+        }
+      ]
+    },
+    "skip": {
+      "steps": [
+        {
+          "if": "$phase | map:{work:true, else:false}",
+          "then": [
+            {
+              "if": "$to_long | map:{0:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "phase": "long"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "set": {
+                    "phase": "short"
+                  }
+                }
+              ]
+            }
+          ],
+          "else": [
+            {
+              "if": "$phase | map:{long:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "sessions": 0,
+                    "to_long": "$long_after"
+                  }
+                }
+              ]
+            },
+            {
+              "set": {
+                "phase": "work"
+              }
+            }
+          ]
+        },
+        {
+          "set": {
+            "ends_at": 0,
+            "left": null,
+            "status": "idle"
+          }
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": "$settings.focus_light",
+          "then": [
+            {
+              "send": {
+                "focus": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at"
+                }
+              },
+              "app": "focus-light"
+            }
+          ]
+        }
+      ]
+    },
+    "restart": {
+      "steps": [
+        {
+          "set": {
+            "phase": "work",
+            "sessions": 0,
+            "to_long": "$long_after",
+            "ends_at": 0,
+            "left": null,
+            "status": "idle"
+          }
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": "$settings.focus_light",
+          "then": [
+            {
+              "send": {
+                "focus": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at"
+                }
+              },
+              "app": "focus-light"
+            }
+          ]
+        }
+      ]
+    },
+    "every_changed": {
+      "steps": [
+        {
+          "set": {
+            "to_long": "$args.value"
+          }
+        },
+        {
+          "increment": {
+            "to_long": "-$sessions"
+          },
+          "min": 0
+        },
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "timer": {
+                  "status": "$status",
+                  "phase": "$phase",
+                  "ends_at": "$ends_at",
+                  "started_at": "$started_at",
+                  "length": "$length",
+                  "left": "$left",
+                  "sessions": "$sessions",
+                  "to_long": "$to_long",
+                  "long_after": "$long_after"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "phase_over": {
+      "steps": [
+        {
+          "if": "$status | map:{running:true, else:false}",
+          "then": [
+            {
+              "if": "$phase | map:{work:true, else:false}",
+              "then": [
+                {
+                  "increment": {
+                    "sessions": 1,
+                    "to_long": -1
+                  },
+                  "min": 0
+                },
+                {
+                  "if": "$to_long | map:{0:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "phase": "long"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "set": {
+                        "phase": "short"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "if": "$phase | map:{long:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "sessions": 0,
+                        "to_long": "$long_after"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "set": {
+                    "phase": "work"
+                  }
+                }
+              ]
+            },
+            {
+              "set": {
+                "ends_at": 0,
+                "left": null,
+                "status": "idle"
+              }
+            },
+            {
+              "notify": {
+                "title": "$phase | map:{work:'Break over', else:'Focus session done'}",
+                "body": "$phase | map:{work:'Time to focus again.', short:'Take a short break.', long:'Take a long break, you earned it.'}"
+              }
+            },
+            {
+              "if": "$auto",
+              "then": [
+                {
+                  "set": {
+                    "started_at": "$now",
+                    "ends_at": "$now",
+                    "length": 0,
+                    "left": null,
+                    "status": "running"
+                  }
+                },
+                {
+                  "if": "$phase | map:{work:true, else:false}",
+                  "then": [
+                    {
+                      "increment": {
+                        "ends_at": "$work_len",
+                        "length": "$work_len"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "if": "$phase | map:{short:true, else:false}",
+                  "then": [
+                    {
+                      "increment": {
+                        "ends_at": "$short_len",
+                        "length": "$short_len"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "if": "$phase | map:{long:true, else:false}",
+                  "then": [
+                    {
+                      "increment": {
+                        "ends_at": "$long_len",
+                        "length": "$long_len"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "if": "$settings.share",
+              "then": [
+                {
+                  "send": {
+                    "timer": {
+                      "status": "$status",
+                      "phase": "$phase",
+                      "ends_at": "$ends_at",
+                      "started_at": "$started_at",
+                      "length": "$length",
+                      "left": "$left",
+                      "sessions": "$sessions",
+                      "to_long": "$to_long",
+                      "long_after": "$long_after"
+                    }
+                  },
+                  "alert": "$phase | map:{work:'Break over: time to focus', else:'Focus session done: take a break'}"
+                }
+              ]
+            },
+            {
+              "if": "$settings.focus_light",
+              "then": [
+                {
+                  "send": {
+                    "focus": {
+                      "status": "$status",
+                      "phase": "$phase",
+                      "ends_at": "$ends_at"
+                    }
+                  },
+                  "app": "focus-light"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "heard": {
+      "steps": [
+        {
+          "if": "$args.event.length",
+          "then": [
+            {
+              "set": {
+                "status": "$args.event.status",
+                "phase": "$args.event.phase",
+                "ends_at": "$args.event.ends_at",
+                "started_at": "$args.event.started_at",
+                "length": "$args.event.length",
+                "left": "$args.event.left",
+                "sessions": "$args.event.sessions",
+                "to_long": "$args.event.to_long",
+                "long_after": "$args.event.long_after"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "timer",
+      "label": "{$status | map:{paused:'Paused ', idle:'Ready', else:''}}{$ends_at | until}{$left | duration}",
+      "label_tone": "$phase | map:{work:'accent', else:'good'}",
+      "card": "main",
+      "label_icon": "$status | map:{running:'timer', paused:'pause.circle', else:'timer'}"
+    },
+    "floating": {
+      "card": "main",
+      "pin": true,
+      "width": "narrow"
+    }
+  },
+  "style": {
+    "accent": "#e5533d"
+  },
+  "settings": {
+    "share": {
+      "type": "toggle",
+      "label": "Share the timer with my other devices",
+      "default": false
+    },
+    "focus_light": {
+      "type": "toggle",
+      "label": "Tell Focus Light when I focus",
+      "default": false,
+      "platforms": [
+        "macos"
+      ]
+    }
+  }
+}

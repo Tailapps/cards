@@ -1,0 +1,127 @@
+{
+  "schema": "tailapps/v0",
+  "app": "expenses",
+  "name": "Expenses",
+  "description": "Jot down what you spend and see the total, what's still to pay, the five biggest and a split by category. On the Mac and iPhone.",
+  "icon": "creditcard",
+  "version": 1,
+  "permissions": [],
+  "state": {
+    "expenses": {
+      "type": "list",
+      "default": [
+        { "id": "1", "title": "Train to Leeds", "amount": 64.5, "category": "Travel", "paid": true },
+        { "id": "2", "title": "Team lunch", "amount": 92, "category": "Food", "paid": true },
+        { "id": "3", "title": "Hotel", "amount": 189, "category": "Travel", "paid": false },
+        { "id": "4", "title": "Coffee", "amount": 3.4, "category": "Food", "paid": true },
+        { "id": "5", "title": "Conference ticket", "amount": 249, "category": "Work", "paid": false },
+        { "id": "6", "title": "Taxi", "amount": 18.2, "category": "Travel", "paid": true }
+      ]
+    },
+    "draft": { "type": "text", "default": "" },
+    "next_id": { "type": "number", "default": 7 },
+    "amount": { "type": "number", "default": 0 },
+    "category": { "type": "text", "default": "Food" }
+  },
+  "actions": {
+    "add": {
+      "steps": [
+        {
+          "if": "$draft",
+          "then": [
+            {
+              "push": {
+                "expenses": { "id": "e{$next_id}", "title": "$draft", "amount": "$amount", "category": "$category", "paid": false }
+              }
+            },
+            { "set": { "draft": "", "amount": 0 } },
+            { "increment": { "next_id": 1 } }
+          ]
+        }
+      ]
+    },
+    "toggle_paid": {
+      "args": { "id": "text" },
+      "steps": [
+        { "update": { "expenses": { "match": { "id": "$args.id" }, "set": { "paid": "$args.value" } } } }
+      ]
+    },
+    "remove_expense": {
+      "args": { "id": "text" },
+      "steps": [
+        { "remove": { "expenses": { "match": { "id": "$args.id" } } } }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              { "stat": "$expenses | sum:'amount' | currency:'GBP':'full'", "label": "Total" },
+              { "spacer": true },
+              { "stat": "$expenses | where:{paid:false} | sum:'amount' | currency:'GBP':'full'", "label": "To pay", "tone": "warn" },
+              { "spacer": true },
+              { "stat": "$expenses | avg:'amount' | currency:'GBP' | default:'—'", "label": "Average" }
+            ],
+            "align": "start"
+          },
+          {
+            "text": "Categories: {$expenses | pluck:'category' | unique | sort | join:' · '}",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$expenses"
+          },
+          {
+            "row": [
+              { "field": "", "type": "text", "bind": "$draft", "placeholder": "What for?", "on_submit": "add" },
+              { "field": "", "type": "number", "bind": "$amount", "placeholder": "£" },
+              { "field": "", "type": "select", "bind": "$category", "options": ["Food", "Travel", "Work", "Home"] }
+            ]
+          },
+          {
+            "column": [
+              { "text": "Biggest five", "size": "s", "emphasis": "subtle" },
+              {
+                "list": "$expenses | sort:'-amount' | limit:5",
+                "empty": "Nothing yet. Add one above.",
+                "item": {
+                  "cell": "$item.title",
+                  "subtitle": "{$item.category} · {$item.amount | currency:'GBP':'full'}",
+                  "check": "$item.paid",
+                  "on_check": "toggle_paid",
+                  "args": { "id": "$item.id" },
+                  "trailing": {
+                    "menu": "More for {$item.title}",
+                    "icon": "ellipsis",
+                    "icon_only": true,
+                    "items": [
+                      { "label": "Delete", "on": "remove_expense", "args": { "id": "$item.id" }, "style": "destructive" }
+                    ]
+                  }
+                }
+              }
+            ],
+            "style": "inset"
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          { "text": "{$expenses | count} expenses, largest {$expenses | max:'amount' | currency:'GBP'}", "size": "s", "emphasis": "subtle", "when": "$expenses" }
+        ]
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "creditcard",
+      "label": "{$expenses | where:{paid:false} | sum:'amount' | currency:'GBP'} to pay",
+      "in_menu": "card"
+    },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "schema": "tailapps/v0",
+  "app": "photo-drop",
+  "name": "Photo Drop",
+  "description": "Take a photo on your iPhone and upload it straight to your own bucket (Cloudflare R2, S3 and others), then copy its link.",
+  "icon": "camera",
+  "permissions": [
+    "camera",
+    "files.write:dest",
+    "clipboard.write"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Upload photos to",
+      "allow": [
+        "s3"
+      ],
+      "required": true,
+      "platforms": [
+        "ios"
+      ]
+    }
+  },
+  "state": {
+    "photos": {
+      "type": "list",
+      "default": []
+    },
+    "lastLink": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "button": "Take Photo",
+            "on": "snap",
+            "style": "primary",
+            "size": "l",
+            "grow": true,
+            "icon": "camera",
+            "disabled": "$running.snap",
+            "platforms": [
+              "ios"
+            ]
+          },
+          {
+            "text": "Photo Drop takes photos on your iPhone: add it there from TailApps on your iPhone (Devices tab).",
+            "size": "s",
+            "emphasis": "subtle",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$photos | count | map:{0:true, else:false}"
+          },
+          {
+            "gallery": "$photos",
+            "limit": 12,
+            "height": "m",
+            "thumb": "$item.thumb",
+            "on_select": "copy_photo",
+            "when": "$photos"
+          },
+          {
+            "text": "Tap a photo to copy its link.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$photos"
+          },
+          {
+            "text": "Photos you take here upload to your bucket. Nothing goes through TailApps.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$photos | count | map:{0:true, else:false}",
+            "platforms": [
+              "ios"
+            ]
+          },
+          {
+            "row": [
+              {
+                "button": "Copy link",
+                "on": "copy_link",
+                "style": "secondary",
+                "disabled": "$lastLink | count | map:{0:true, else:false}"
+              }
+            ],
+            "justify": "end"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "snap": {
+      "steps": [
+        {
+          "camera.take": {},
+          "as": "photo"
+        },
+        {
+          "files.save": {
+            "data": "$photo.path",
+            "to": "$settings.dest",
+            "name": "photo-{$now}.jpg"
+          },
+          "as": "saved"
+        },
+        {
+          "set": {
+            "lastLink": "$saved.url"
+          }
+        },
+        {
+          "push": {
+            "photos": {
+              "thumb": "$photo.path",
+              "url": "$saved.url",
+              "key": "$saved.key",
+              "at": "$now"
+            }
+          },
+          "max": 30
+        }
+      ]
+    },
+    "copy_link": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$lastLink"
+          }
+        }
+      ]
+    },
+    "copy_photo": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$args.item.url"
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "camera",
+      "label": "{$photos | count} photos",
+      "card": "main"
+    }
+  }
+}

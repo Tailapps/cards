@@ -1,0 +1,64 @@
+{
+  "schema": "tailapps/v0",
+  "app": "laravel-cloud",
+  "name": "Laravel Cloud",
+  "description": "Deploy status and a Deploy button for one project, from your Mac (cloud CLI). For status on your iPhone, turn on \"Show on my other devices\" there, then Sync to My Devices.",
+  "version": 2,
+  "icon": "cloud",
+  "requires": [{ "cli": "cloud", "install": "composer global require laravel/cloud-cli", "check": ["cloud", "--version"] }],
+  "permissions": ["cli:cloud deployment:list", "cli:cloud deploy", "cli:cloud dashboard", "notify", "inbox:deploy", "send:deploy"],
+  "settings": {
+    "project": { "type": "folder", "label": "Project folder", "must_contain": ".cloud", "required": true, "sync": false, "platforms": ["macos"] },
+    "share": { "type": "toggle", "label": "Show on my other devices", "default": false, "platforms": ["macos"] }
+  },
+  "state": { "deploys": { "type": "list", "default": [] } },
+  "sources": {
+    "deploys": { "cli": "cloud", "args": ["deployment:list", "--json"], "cwd": "$settings.project", "every": 30, "select": "data", "platforms": ["macos"],
+      "on_change": { "action": "report", "watch": "{$deploys.0.created_at}-{$deploys.0.status}" } },
+    "shared": { "inbox": "deploy", "on_receive": "heard" }
+  },
+  "cards": [{ "id": "main", "layout": { "column": [
+    { "list": "$deploys", "limit": 5, "empty": "No deployments yet", "item": { "row": [
+      { "text": "$item.commit_message | truncate:40", "grow": true },
+      { "badge": "$item.status | map:{finished:'Live', failed:'Failed', else:'Deploying'}",
+        "tone": "$item.status | tone:{finished:'good', failed:'bad', else:'accent'}",
+        "busy": "$item.status | map:{finished:false, failed:false, else:true}" },
+      { "text": "$item.created_at | ago", "emphasis": "subtle", "size": "s" }
+    ], "align": "center", "gap": "s" } },
+    { "text": "Updated {$meta.deploys.updated | ago}", "size": "xs", "emphasis": "subtle", "when": "$meta.deploys.updated" },
+    { "row": [
+      { "button": "Deploy", "on": "deploy", "style": "primary", "disabled": "$running.deploy" },
+      { "button": "Open in Cloud", "on": "dashboard", "style": "plain" }
+    ], "gap": "s", "platforms": ["macos"] },
+    { "text": "The latest deploy, from your Mac. Deploy from there.", "size": "xs", "emphasis": "subtle", "platforms": ["ios"] }
+  ], "gap": "m" } }],
+  "actions": {
+    "deploy": { "confirm": "Deploy this project now?", "steps": [
+      { "cli": "cloud", "args": ["deploy", "--json"], "cwd": "$settings.project", "timeout": 600 },
+      { "refresh": "deploys" },
+      { "notify": { "title": "Laravel Cloud", "body": "Deploy finished" } }
+    ] },
+    "dashboard": { "steps": [{ "cli": "cloud", "args": ["dashboard"], "cwd": "$settings.project" }] },
+    "report": { "steps": [
+      { "if": "$settings.share", "then": [
+        { "if": "$args.previous", "then": [
+          { "send": { "deploy": { "status": "$deploys.0.status", "commit_message": "$deploys.0.commit_message", "created_at": "$deploys.0.created_at" } },
+            "alert": "$deploys.0.status | map:{failed:'Laravel Cloud deploy failed', else:''}" }
+        ], "else": [
+          { "send": { "deploy": { "status": "$deploys.0.status", "commit_message": "$deploys.0.commit_message", "created_at": "$deploys.0.created_at" } } }
+        ] }
+      ] }
+    ] },
+    "heard": { "steps": [
+      { "if": "$args.event.status", "then": [{ "set": { "deploys": ["$args.event"] } }] }
+    ] }
+  },
+  "views": {
+    "menubar": { "icon": "cloud", "card": "main",
+      "label": "$deploys.0.status | map:{finished:'Live', failed:'Failed', else:'Deploying'}",
+      "label_tone": "$deploys.0.status | tone:{finished:'good', failed:'bad', else:'accent'}",
+      "label_icon": "$deploys.0.status | map:{finished:'checkmark.icloud', failed:'xmark.icloud', else:'icloud.and.arrow.up'}" },
+    "floating": { "card": "main" }
+  },
+  "shortcuts": { "actions": { "deploy": { "keys": "mod+opt+d", "scope": "global" } } }
+}

@@ -1,0 +1,223 @@
+{
+  "schema": "tailapps/v0",
+  "app": "wallpaper",
+  "name": "Wallpaper",
+  "description": "Drop a picture to make it your desktop picture, on all screens or the main one, and switch back from a gallery. With Sync to My Devices on, pick or take a photo on your iPhone to set it.",
+  "icon": "photo.on.rectangle",
+  "permissions": [
+    "wallpaper.control",
+    "files.write:folder",
+    "inbox:pictures",
+    "inbox:choose",
+    "send:pictures",
+    "send:choose",
+    "camera",
+    "inbox:photo",
+    "send:photo"
+  ],
+  "settings": {
+    "folder": {
+      "type": "folder",
+      "label": "Keep pictures in",
+      "default": "~/Pictures/Wallpapers",
+      "create": true,
+      "required": true,
+      "platforms": ["macos"]
+    },
+    "phone": {
+      "type": "toggle",
+      "label": "Show my pictures on my iPhone",
+      "default": false,
+      "platforms": ["macos"]
+    }
+  },
+  "state": {
+    "pictures": { "type": "list", "default": [], "sync": false },
+    "phone_pictures": { "type": "list", "default": [], "sync": false },
+    "screen": { "type": "text", "default": "all", "sync": false },
+    "fit": { "type": "text", "default": "fill", "sync": false }
+  },
+  "sources": {
+    "from_mac": { "inbox": "pictures", "on_receive": "received_picture", "platforms": ["ios"] },
+    "choose": { "inbox": "choose", "on_receive": "chosen_on_phone", "platforms": ["macos"] },
+    "photo": { "inbox": "photo", "on_receive": "photo_from_phone", "platforms": ["macos"] }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "drop": "Drop a picture to use it",
+            "on": "add",
+            "accept": [".jpg", ".jpeg", ".png", ".heic", ".heif", ".tif", ".tiff", ".gif", ".webp", ".bmp"],
+            "hint": "JPG, PNG, HEIC… it's kept in your Wallpapers folder",
+            "platforms": ["macos"]
+          },
+          {
+            "column": [
+              {
+                "cell": "Screens",
+                "leading": "display.2",
+                "trailing": {
+                  "field": "Screens",
+                  "type": "segmented",
+                  "bind": "$screen",
+                  "options": [
+                    { "label": "All", "value": "all" },
+                    { "label": "Main", "value": "main" }
+                  ]
+                }
+              },
+              {
+                "cell": "Fit",
+                "leading": "arrow.up.left.and.arrow.down.right",
+                "trailing": {
+                  "field": "Fit",
+                  "type": "select",
+                  "bind": "$fit",
+                  "options": [
+                    { "label": "Fill", "value": "fill" },
+                    { "label": "Fit", "value": "fit" },
+                    { "label": "Stretch", "value": "stretch" },
+                    { "label": "Centre", "value": "center" }
+                  ]
+                }
+              }
+            ],
+            "style": "inset",
+            "platforms": ["macos"]
+          },
+          {
+            "gallery": "$pictures",
+            "thumb": "$item.path",
+            "limit": 24,
+            "height": "m",
+            "on_select": "use",
+            "when": "$pictures",
+            "platforms": ["macos"]
+          },
+          {
+            "text": "Click a picture to use it again. ⋯ › Undo puts the last one back.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$pictures",
+            "platforms": ["macos"]
+          },
+          {
+            "row": [
+              { "button": "Choose Photo", "on": "send_library_photo", "style": "primary", "icon": "photo.on.rectangle", "grow": true, "disabled": "$running.send_library_photo" },
+              { "button": "Take Photo", "on": "send_camera_photo", "style": "secondary", "icon": "camera", "grow": true, "disabled": "$running.send_camera_photo" }
+            ],
+            "platforms": ["ios"]
+          },
+          {
+            "gallery": "$phone_pictures",
+            "thumb": "$item.file",
+            "limit": 24,
+            "height": "m",
+            "on_select": "choose_on_phone",
+            "when": "$phone_pictures",
+            "platforms": ["ios"]
+          },
+          {
+            "text": "Tap a picture to make it your Mac's desktop picture.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$phone_pictures",
+            "platforms": ["ios"]
+          },
+          {
+            "text": "Choose or take a photo to make it your Mac's desktop picture. Pictures you add on the Mac show here too, with Show my pictures on my iPhone turned on there.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$phone_pictures | count | map:{0:true, else:false}",
+            "platforms": ["ios"]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "add": {
+      "steps": [
+        { "wallpaper.set": { "image": "$args.files.0.path", "screen": "$screen", "fit": "$fit" } },
+        {
+          "files.save": { "data": "$args.files.0.path", "to": "$settings.folder", "name": "$args.files.0.name" },
+          "as": "saved"
+        },
+        { "push": { "pictures": { "path": "$saved", "name": "$args.files.0.name", "at": "$now" } }, "max": 24 },
+        {
+          "if": "$settings.phone",
+          "then": [
+            { "send": { "pictures": { "path": "$saved", "name": "$args.files.0.name" } }, "file": "$saved" }
+          ]
+        }
+      ]
+    },
+    "use": {
+      "steps": [
+        { "wallpaper.set": { "image": "$args.item.path", "screen": "$screen", "fit": "$fit" } }
+      ]
+    },
+    "received_picture": {
+      "steps": [
+        {
+          "if": "$args.file",
+          "then": [
+            { "push": { "phone_pictures": { "file": "$args.file", "path": "$args.event.path", "name": "$args.event.name", "mac": "$args.from_id" } }, "max": 24 }
+          ]
+        }
+      ]
+    },
+    "choose_on_phone": {
+      "steps": [
+        { "send": { "choose": { "path": "$args.item.path" } }, "to": "$args.item.mac" }
+      ]
+    },
+    "send_library_photo": {
+      "runs_on": ["ios"],
+      "steps": [
+        { "photos.pick": { "max_px": 4096 }, "as": "p" },
+        { "send": { "photo": { "name": "$p.name" } }, "file": "$p.path" }
+      ]
+    },
+    "send_camera_photo": {
+      "runs_on": ["ios"],
+      "steps": [
+        { "camera.take": { "max_px": 4096 }, "as": "p" },
+        { "send": { "photo": { "name": "$p.name" } }, "file": "$p.path" }
+      ]
+    },
+    "photo_from_phone": {
+      "runs_on": ["macos"],
+      "steps": [
+        {
+          "if": "$args.file",
+          "then": [
+            { "wallpaper.set": { "image": "$args.file", "screen": "$screen", "fit": "$fit" } },
+            { "files.save": { "data": "$args.file", "to": "$settings.folder", "name": "$args.event.name" }, "as": "saved" },
+            { "push": { "pictures": { "path": "$saved", "name": "$args.event.name", "at": "$now" } }, "max": 24 },
+            {
+              "if": "$settings.phone",
+              "then": [
+                { "send": { "pictures": { "path": "$saved", "name": "$args.event.name" } }, "file": "$saved" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "chosen_on_phone": {
+      "runs_on": ["macos"],
+      "steps": [
+        { "wallpaper.set": { "image": "$args.event.path", "screen": "$screen", "fit": "$fit" } }
+      ]
+    }
+  },
+  "views": {
+    "menubar": { "icon": "photo.on.rectangle", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

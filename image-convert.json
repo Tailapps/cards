@@ -1,0 +1,172 @@
+{
+  "schema": "tailapps/v0",
+  "app": "image-convert",
+  "name": "Image Convert",
+  "description": "Drop images to convert them to JPG, PNG, HEIC or TIFF, optionally smaller, into a folder you choose. The originals stay as they are.",
+  "icon": "photo.on.rectangle.angled",
+  "permissions": [
+    "script:convert.sh",
+    "notify"
+  ],
+  "settings": {
+    "folder": {
+      "type": "folder",
+      "label": "Save converted images to",
+      "default": "~/Pictures/Converted",
+      "create": true,
+      "required": true
+    }
+  },
+  "state": {
+    "format": {
+      "type": "text",
+      "default": "jpeg"
+    },
+    "size": {
+      "type": "text",
+      "default": "0"
+    },
+    "last": {
+      "type": "any",
+      "default": null
+    },
+    "last_at": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "scripts": {
+    "convert.sh": "#!/bin/sh\n# convert.sh <format> <longest side, 0 = keep> <folder> <files JSON>\n# Converts each dropped image into the folder you chose, with the Mac's own sips (ImageMagick on Linux). Never overwrites (photo 2.jpg, …),\n# never touches the originals. Prints { converted, failed, folder, first } for the card.\nformat=\"$1\"; size=\"$2\"; folder=\"$3\"; files=\"$4\"\ncase \"$format\" in jpeg) ext=jpg ;; png|heic|tiff) ext=\"$format\" ;; *) echo \"Unknown format '$format'\" >&2; exit 1 ;; esac\ncase \"$size\" in ''|*[!0-9]*) size=0 ;; esac\n[ -d \"$folder\" ] || { echo \"Choose where converted images go first (⋯ › Settings…)\" >&2; exit 1; }\nif command -v sips >/dev/null 2>&1; then tool=sips\nelif command -v magick >/dev/null 2>&1; then tool=magick\nelif command -v convert >/dev/null 2>&1; then tool=convert\nelse echo \"Needs sips (on a Mac) or ImageMagick\" >&2; exit 1; fi\npaths=$(printf '%s' \"$files\" | jq -r '.[].path') || { echo \"Couldn't read the dropped files\" >&2; exit 1; }\nok=0; bad=0; first=''\nwhile IFS= read -r src; do\n  [ -n \"$src\" ] || continue\n  name=$(basename \"$src\"); base=\"${name%.*}\"\n  dest=\"$folder/$base.$ext\"; n=2\n  while [ -e \"$dest\" ]; do dest=\"$folder/$base $n.$ext\"; n=$((n + 1)); done\n  if [ \"$tool\" != sips ] && [ \"$size\" -gt 0 ]; then\n    \"$tool\" \"$src\" -resize \"${size}x${size}\" \"$dest\" >/dev/null 2>&1\n  elif [ \"$tool\" != sips ]; then\n    \"$tool\" \"$src\" \"$dest\" >/dev/null 2>&1\n  elif [ \"$size\" -gt 0 ]; then\n    sips -s format \"$format\" -Z \"$size\" \"$src\" --out \"$dest\" >/dev/null 2>&1\n  else\n    sips -s format \"$format\" \"$src\" --out \"$dest\" >/dev/null 2>&1\n  fi\n  if [ -e \"$dest\" ]; then\n    ok=$((ok + 1)); [ -n \"$first\" ] || first=$(basename \"$dest\")\n  else\n    bad=$((bad + 1))\n  fi\ndone <<EOF\n$paths\nEOF\n[ \"$ok\" -gt 0 ] || { echo \"None of the $bad image(s) could be converted\" >&2; exit 1; }\njq -n --argjson ok \"$ok\" --argjson bad \"$bad\" --arg folder \"$folder\" --arg first \"$first\" \\\n  '{ converted: $ok, failed: $bad, folder: $folder, first: $first }'\n\n"
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "drop": "Drop images to convert",
+            "on": "convert",
+            "accept": [
+              "image"
+            ],
+            "multiple": true,
+            "max": 50,
+            "hint": "PNG, JPG, HEIC, TIFF, WebP… up to 50 at once"
+          },
+          {
+            "column": [
+              {
+                "cell": "Format",
+                "leading": "doc.badge.gearshape",
+                "trailing": {
+                  "field": "Format",
+                  "type": "segmented",
+                  "bind": "$format",
+                  "options": [
+                    {
+                      "label": "JPG",
+                      "value": "jpeg"
+                    },
+                    {
+                      "label": "PNG",
+                      "value": "png"
+                    },
+                    {
+                      "label": "HEIC",
+                      "value": "heic"
+                    },
+                    {
+                      "label": "TIFF",
+                      "value": "tiff"
+                    }
+                  ]
+                }
+              },
+              {
+                "cell": "Size",
+                "leading": "arrow.up.left.and.arrow.down.right",
+                "trailing": {
+                  "field": "Size",
+                  "type": "select",
+                  "bind": "$size",
+                  "options": [
+                    {
+                      "label": "Keep size",
+                      "value": "0"
+                    },
+                    {
+                      "label": "Longest side 3000",
+                      "value": "3000"
+                    },
+                    {
+                      "label": "Longest side 2048",
+                      "value": "2048"
+                    },
+                    {
+                      "label": "Longest side 1024",
+                      "value": "1024"
+                    },
+                    {
+                      "label": "Longest side 512",
+                      "value": "512"
+                    }
+                  ]
+                }
+              },
+              {
+                "cell": "Converted {$last.converted} image(s)",
+                "subtitle": "{$last.first} · {$last_at | ago}",
+                "leading": {
+                  "icon": "checkmark.circle.fill",
+                  "tone": "good",
+                  "size": "l"
+                },
+                "count": "$last.failed",
+                "when": "$last"
+              }
+            ],
+            "style": "inset"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "convert": {
+      "steps": [
+        {
+          "script": "convert.sh",
+          "args": [
+            "$format",
+            "$size",
+            "$settings.folder",
+            "$args.files"
+          ],
+          "parse": "json",
+          "timeout": 300,
+          "as": "done"
+        },
+        {
+          "set": {
+            "last": "$done",
+            "last_at": "$now"
+          }
+        },
+        {
+          "notify": "Converted {$done.converted} image(s) into {$done.folder}"
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "photo.on.rectangle.angled",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "narrow"
+    }
+  }
+}

@@ -1,0 +1,510 @@
+{
+  "schema": "tailapps/v0",
+  "app": "shot-editor",
+  "name": "Shot Editor",
+  "description": "Take a screenshot (or a photo on iPhone), mark it up with arrows, boxes and hidden parts, put it on a colourful background with padding, rounded corners and a shadow, then copy, share or upload it.",
+  "icon": "photo.on.rectangle.angled",
+  "permissions": [
+    "screen.capture",
+    "camera",
+    "clipboard.write",
+    "share",
+    "files.write:dest"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Upload pictures to",
+      "allow": [
+        "s3"
+      ]
+    }
+  },
+  "state": {
+    "shot": {
+      "type": "text",
+      "default": ""
+    },
+    "result": {
+      "type": "text",
+      "default": ""
+    },
+    "marked": {
+      "type": "object",
+      "default": {}
+    },
+    "shots": {
+      "type": "list",
+      "default": []
+    },
+    "from": {
+      "type": "text",
+      "default": "purple"
+    },
+    "to": {
+      "type": "text",
+      "default": "orange"
+    },
+    "padding": {
+      "type": "text",
+      "default": "l"
+    },
+    "corners": {
+      "type": "text",
+      "default": "m"
+    },
+    "shadow": {
+      "type": "bool",
+      "default": true
+    },
+    "aspect": {
+      "type": "text",
+      "default": "auto"
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "button": "Capture",
+                "icon": "camera.viewfinder",
+                "on": "capture",
+                "style": "primary",
+                "grow": true,
+                "platforms": [
+                  "macos"
+                ]
+              },
+              {
+                "button": "Take Photo",
+                "icon": "camera",
+                "on": "photo",
+                "style": "primary",
+                "grow": true,
+                "platforms": [
+                  "ios"
+                ]
+              },
+              {
+                "button": "Background",
+                "icon": "paintpalette",
+                "style": "secondary",
+                "popover": [
+                  {
+                    "field": "From",
+                    "type": "select",
+                    "bind": "$from",
+                    "options": [
+                      "red",
+                      "orange",
+                      "yellow",
+                      "green",
+                      "mint",
+                      "teal",
+                      "cyan",
+                      "blue",
+                      "indigo",
+                      "purple",
+                      "pink",
+                      "brown",
+                      "gray"
+                    ],
+                    "on_change": "render"
+                  },
+                  {
+                    "field": "To",
+                    "type": "select",
+                    "bind": "$to",
+                    "options": [
+                      "red",
+                      "orange",
+                      "yellow",
+                      "green",
+                      "mint",
+                      "teal",
+                      "cyan",
+                      "blue",
+                      "indigo",
+                      "purple",
+                      "pink",
+                      "brown",
+                      "gray"
+                    ],
+                    "on_change": "render"
+                  },
+                  {
+                    "field": "Padding",
+                    "type": "segmented",
+                    "bind": "$padding",
+                    "options": [
+                      {
+                        "label": "None",
+                        "value": "none"
+                      },
+                      {
+                        "label": "S",
+                        "value": "s"
+                      },
+                      {
+                        "label": "M",
+                        "value": "m"
+                      },
+                      {
+                        "label": "L",
+                        "value": "l"
+                      },
+                      {
+                        "label": "XL",
+                        "value": "xl"
+                      }
+                    ],
+                    "on_change": "render"
+                  },
+                  {
+                    "field": "Corners",
+                    "type": "segmented",
+                    "bind": "$corners",
+                    "options": [
+                      {
+                        "label": "None",
+                        "value": "none"
+                      },
+                      {
+                        "label": "S",
+                        "value": "s"
+                      },
+                      {
+                        "label": "M",
+                        "value": "m"
+                      },
+                      {
+                        "label": "L",
+                        "value": "l"
+                      }
+                    ],
+                    "on_change": "render"
+                  },
+                  {
+                    "field": "Shape",
+                    "type": "select",
+                    "bind": "$aspect",
+                    "options": [
+                      {
+                        "label": "As captured",
+                        "value": "auto"
+                      },
+                      {
+                        "label": "Square",
+                        "value": "1:1"
+                      },
+                      {
+                        "label": "4:3",
+                        "value": "4:3"
+                      },
+                      {
+                        "label": "16:9",
+                        "value": "16:9"
+                      },
+                      {
+                        "label": "Portrait 9:16",
+                        "value": "9:16"
+                      }
+                    ],
+                    "on_change": "render"
+                  },
+                  {
+                    "field": "Shadow",
+                    "type": "toggle",
+                    "bind": "$shadow",
+                    "on_change": "render"
+                  }
+                ],
+                "when": "$shot"
+              }
+            ],
+            "gap": "s"
+          },
+          {
+            "tabs": [
+              {
+                "label": "Result",
+                "icon": "photo",
+                "children": [
+                  {
+                    "image": "$result",
+                    "height": "xl",
+                    "fit": "fit",
+                    "preview": true,
+                    "alt": "Your picture on its background"
+                  },
+                  {
+                    "row": [
+                      {
+                        "button": "Copy",
+                        "icon": "doc.on.doc",
+                        "on": "copy",
+                        "style": "secondary"
+                      },
+                      {
+                        "button": "Share…",
+                        "icon": "square.and.arrow.up",
+                        "on": "share_it",
+                        "style": "secondary"
+                      },
+                      {
+                        "button": "Upload",
+                        "icon": "icloud.and.arrow.up",
+                        "on": "upload",
+                        "disabled": "$running.upload",
+                        "grow": true
+                      }
+                    ],
+                    "gap": "s"
+                  }
+                ]
+              },
+              {
+                "label": "Mark Up",
+                "icon": "pencil.tip",
+                "children": [
+                  {
+                    "canvas": "markup",
+                    "bind": "$marked",
+                    "background": "$shot",
+                    "tools": [
+                      "arrow",
+                      "rect",
+                      "ellipse",
+                      "pen",
+                      "marker",
+                      "redact",
+                      "eraser"
+                    ],
+                    "tones": [
+                      "red",
+                      "yellow",
+                      "blue",
+                      "black",
+                      "white"
+                    ],
+                    "height": "l",
+                    "on_change": "render"
+                  }
+                ]
+              }
+            ],
+            "when": "$result"
+          },
+          {
+            "gallery": "$shots",
+            "limit": 6,
+            "height": "s",
+            "selected": {
+              "value": "$item",
+              "is": "$shot"
+            },
+            "on_select": "pick",
+            "when": "$shots"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "capture": {
+      "steps": [
+        {
+          "screen.capture": {
+            "mode": "region"
+          },
+          "as": "img"
+        },
+        {
+          "set": {
+            "shot": "$img"
+          }
+        },
+        {
+          "canvas.clear": "markup"
+        },
+        {
+          "push": {
+            "shots": "$img"
+          },
+          "max": 6
+        },
+        {
+          "image.compose": {
+            "image": "$shot",
+            "background": {
+              "gradient": [
+                "$from",
+                "$to"
+              ]
+            },
+            "padding": "$padding",
+            "corners": "$corners",
+            "shadow": "$shadow",
+            "aspect": "$aspect"
+          },
+          "as": "nice"
+        },
+        {
+          "set": {
+            "result": "$nice.path"
+          }
+        }
+      ]
+    },
+    "photo": {
+      "steps": [
+        {
+          "camera.take": {},
+          "as": "photo"
+        },
+        {
+          "set": {
+            "shot": "$photo.path"
+          }
+        },
+        {
+          "canvas.clear": "markup"
+        },
+        {
+          "push": {
+            "shots": "$photo.path"
+          },
+          "max": 6
+        },
+        {
+          "image.compose": {
+            "image": "$shot",
+            "background": {
+              "gradient": [
+                "$from",
+                "$to"
+              ]
+            },
+            "padding": "$padding",
+            "corners": "$corners",
+            "shadow": "$shadow",
+            "aspect": "$aspect"
+          },
+          "as": "nice"
+        },
+        {
+          "set": {
+            "result": "$nice.path"
+          }
+        }
+      ]
+    },
+    "pick": {
+      "steps": [
+        {
+          "set": {
+            "shot": "$args.item"
+          }
+        },
+        {
+          "canvas.clear": "markup"
+        },
+        {
+          "image.compose": {
+            "image": "$shot",
+            "background": {
+              "gradient": [
+                "$from",
+                "$to"
+              ]
+            },
+            "padding": "$padding",
+            "corners": "$corners",
+            "shadow": "$shadow",
+            "aspect": "$aspect"
+          },
+          "as": "nice"
+        },
+        {
+          "set": {
+            "result": "$nice.path"
+          }
+        }
+      ]
+    },
+    "render": {
+      "steps": [
+        {
+          "if": "$shot",
+          "then": [
+            {
+              "image.compose": {
+                "image": "$marked.path | default:$shot",
+                "background": {
+                  "gradient": [
+                    "$from",
+                    "$to"
+                  ]
+                },
+                "padding": "$padding",
+                "corners": "$corners",
+                "shadow": "$shadow",
+                "aspect": "$aspect"
+              },
+              "as": "nice"
+            },
+            {
+              "set": {
+                "result": "$nice.path"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "copy": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "image": "$result"
+          }
+        }
+      ]
+    },
+    "share_it": {
+      "steps": [
+        {
+          "share": {
+            "file": "$result"
+          }
+        }
+      ]
+    },
+    "upload": {
+      "timeout": 600,
+      "steps": [
+        {
+          "files.save": {
+            "data": "$result",
+            "to": "$settings.dest",
+            "name": "shot-{$now}.png"
+          },
+          "as": "saved"
+        },
+        {
+          "clipboard.write": {
+            "text": "$saved.url"
+          }
+        },
+        {
+          "toast": "Link copied"
+        }
+      ]
+    }
+  }
+}

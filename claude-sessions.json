@@ -1,0 +1,643 @@
+{
+  "schema": "tailapps/v0",
+  "app": "claude-sessions",
+  "name": "Claude sessions",
+  "description": "Your running Claude Code sessions: folder, working, done or waiting on you, and for how long. Fed by Claude Code hooks on your Mac; with Sync to My Devices it nudges your iPhone too.",
+  "icon": "sparkles",
+  "version": 3,
+  "permissions": [
+    "inbox:agent",
+    "inbox:tools",
+    "inbox:nudge",
+    "send:nudge",
+    "notify",
+    "clipboard.write"
+  ],
+  "settings": {
+    "nudge": {
+      "type": "toggle",
+      "label": "Nudge my iPhone when a session finishes or needs me",
+      "default": true,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "state": {
+    "sessions": {
+      "type": "list",
+      "default": [],
+      "sync": true
+    },
+    "prior": {
+      "type": "text",
+      "default": ""
+    },
+    "incoming": {
+      "type": "text",
+      "default": ""
+    },
+    "changed": {
+      "type": "bool",
+      "default": false
+    },
+    "active": {
+      "type": "number",
+      "default": 0
+    },
+    "waiting": {
+      "type": "number",
+      "default": 0
+    },
+    "mood": {
+      "type": "text",
+      "default": "idle"
+    }
+  },
+  "sources": {
+    "events": {
+      "inbox": "agent",
+      "on_receive": "seen",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "tool_events": {
+      "inbox": "tools",
+      "on_receive": "seen",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "nudges": {
+      "inbox": "nudge"
+    }
+  },
+  "actions": {
+    "seen": {
+      "steps": [
+        {
+          "if": "$args.event.session_id",
+          "then": [
+            {
+              "set": {
+                "prior": "$sessions | where:'id':$args.event.session_id | pick:0 | pick:'status' | default:'new'"
+              }
+            },
+            {
+              "set": {
+                "incoming": "$args.event.hook_event_name | map:{SessionStart:'idle', Stop:'done', Notification:'waiting', else:'working'}"
+              }
+            },
+            {
+              "if": "$args.event.hook_event_name | map:{Notification:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "incoming": "$args.event.notification_type | map:{null:'waiting', permission_prompt:'waiting', elicitation_dialog:'waiting', idle_prompt:'done', else:'same'}"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "$prior | map:{new:false, else:true}",
+              "then": [
+                {
+                  "if": "$args.event.hook_event_name | map:{SessionStart:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "incoming": "same"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "if": "$incoming | map:{same:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "incoming": "$prior"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "if": "$incoming | map:{same:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "incoming": "working"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "set": {
+                "changed": "$prior | map:{new:true, else:false}"
+              }
+            },
+            {
+              "if": "$sessions | where:'id':$args.event.session_id | where:'status':$incoming | count | map:{0:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "changed": true
+                  }
+                }
+              ]
+            },
+            {
+              "if": "$args.event.hook_event_name | map:{SessionEnd:true, else:false}",
+              "then": [
+                {
+                  "remove": {
+                    "sessions": {
+                      "match": {
+                        "id": "$args.event.session_id"
+                      }
+                    }
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "if": "$prior | map:{new:true, else:false}",
+                  "then": [
+                    {
+                      "push": {
+                        "sessions": {
+                          "id": "$args.event.session_id",
+                          "cwd": "$args.event.cwd",
+                          "status": "$incoming",
+                          "started": "$now",
+                          "since": "$now",
+                          "message": "$args.event.message"
+                        }
+                      },
+                      "max": 20
+                    }
+                  ],
+                  "else": [
+                    {
+                      "if": "$changed",
+                      "then": [
+                        {
+                          "update": {
+                            "sessions": {
+                              "match": {
+                                "id": "$args.event.session_id"
+                              },
+                              "set": {
+                                "status": "$incoming",
+                                "since": "$now",
+                                "message": "$args.event.message"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "each": "$sessions",
+              "do": [
+                {
+                  "if": "$item.since | times:-1 | add:$now | tone:{bad:'>43200', else:'good'} | map:{bad:true, else:false}",
+                  "then": [
+                    {
+                      "remove": {
+                        "sessions": {
+                          "match": {
+                            "id": "$item.id"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "set": {
+                "active": "$sessions | where:'status':'working' | count",
+                "waiting": "$sessions | where:'status':'waiting' | count"
+              }
+            },
+            {
+              "set": {
+                "mood": "$active | map:{0:'idle', else:'busy'}"
+              }
+            },
+            {
+              "if": "$waiting",
+              "then": [
+                {
+                  "set": {
+                    "mood": "waiting"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "$changed",
+              "then": [
+                {
+                  "if": "$incoming | map:{waiting:true, else:false}",
+                  "then": [
+                    {
+                      "notify": {
+                        "title": "Claude needs you",
+                        "body": "{$args.event.cwd | split:'/' | limit:-1 | join}: {$args.event.message | default:'A session is waiting'}"
+                      }
+                    },
+                    {
+                      "if": "$settings.nudge",
+                      "then": [
+                        {
+                          "send": {
+                            "nudge": {
+                              "event": "waiting",
+                              "at": "$now"
+                            }
+                          },
+                          "alert": "Claude needs you in {$args.event.cwd | split:'/' | limit:-1 | join}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "if": "$args.event.hook_event_name | map:{Stop:true, else:false}",
+                  "then": [
+                    {
+                      "if": "$settings.nudge",
+                      "then": [
+                        {
+                          "send": {
+                            "nudge": {
+                              "event": "done",
+                              "at": "$now"
+                            }
+                          },
+                          "alert": "Claude finished in {$args.event.cwd | split:'/' | limit:-1 | join}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "resume": {
+      "args": {
+        "id": "text",
+        "cwd": "text"
+      },
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "claude --resume {$args.id}"
+          }
+        },
+        {
+          "toast": "Copied. Run it in Terminal in {$args.cwd | split:'/' | limit:-1 | join}."
+        }
+      ]
+    },
+    "copy_folder": {
+      "args": {
+        "cwd": "text"
+      },
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$args.cwd"
+          }
+        },
+        {
+          "toast": "Copied the folder path."
+        }
+      ]
+    },
+    "forget": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "remove": {
+            "sessions": {
+              "match": {
+                "id": "$args.id"
+              }
+            }
+          }
+        },
+        {
+          "each": "$sessions",
+          "do": [
+            {
+              "if": "$item.since | times:-1 | add:$now | tone:{bad:'>43200', else:'good'} | map:{bad:true, else:false}",
+              "then": [
+                {
+                  "remove": {
+                    "sessions": {
+                      "match": {
+                        "id": "$item.id"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "set": {
+            "active": "$sessions | where:'status':'working' | count",
+            "waiting": "$sessions | where:'status':'waiting' | count"
+          }
+        },
+        {
+          "set": {
+            "mood": "$active | map:{0:'idle', else:'busy'}"
+          }
+        },
+        {
+          "if": "$waiting",
+          "then": [
+            {
+              "set": {
+                "mood": "waiting"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "clear": {
+      "steps": [
+        {
+          "remove": {
+            "sessions": {
+              "match": {
+                "status": "done"
+              }
+            }
+          }
+        },
+        {
+          "each": "$sessions",
+          "do": [
+            {
+              "if": "$item.since | times:-1 | add:$now | tone:{bad:'>43200', else:'good'} | map:{bad:true, else:false}",
+              "then": [
+                {
+                  "remove": {
+                    "sessions": {
+                      "match": {
+                        "id": "$item.id"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "set": {
+            "active": "$sessions | where:'status':'working' | count",
+            "waiting": "$sessions | where:'status':'waiting' | count"
+          }
+        },
+        {
+          "set": {
+            "mood": "$active | map:{0:'idle', else:'busy'}"
+          }
+        },
+        {
+          "if": "$waiting",
+          "then": [
+            {
+              "set": {
+                "mood": "waiting"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "recount": {
+      "steps": [
+        {
+          "each": "$sessions",
+          "do": [
+            {
+              "if": "$item.since | times:-1 | add:$now | tone:{bad:'>43200', else:'good'} | map:{bad:true, else:false}",
+              "then": [
+                {
+                  "remove": {
+                    "sessions": {
+                      "match": {
+                        "id": "$item.id"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "set": {
+            "active": "$sessions | where:'status':'working' | count",
+            "waiting": "$sessions | where:'status':'waiting' | count"
+          }
+        },
+        {
+          "set": {
+            "mood": "$active | map:{0:'idle', else:'busy'}"
+          }
+        },
+        {
+          "if": "$waiting",
+          "then": [
+            {
+              "set": {
+                "mood": "waiting"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "on_sync": "recount",
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "list": "$sessions",
+            "limit": 8,
+            "item": {
+              "cell": "$item.cwd | split:'/' | limit:-1 | join",
+              "subtitle": "{$item.status | map:{working:'Working', waiting:'Needs you', done:'Done', idle:'Ready'}}{$item.message | map:{null:'', else:' · '}}{$item.message}",
+              "status": "$item.status | tone:{working:'accent', waiting:'warn', done:'good', else:'neutral'}",
+              "trailing": {
+                "timer": "$item.started",
+                "format": "short"
+              },
+              "on": "resume",
+              "args": {
+                "id": "$item.id",
+                "cwd": "$item.cwd"
+              },
+              "context_menu": [
+                {
+                  "label": "Copy resume command",
+                  "icon": "doc.on.doc",
+                  "on": "resume",
+                  "args": {
+                    "id": "$item.id",
+                    "cwd": "$item.cwd"
+                  }
+                },
+                {
+                  "label": "Copy folder path",
+                  "icon": "folder",
+                  "on": "copy_folder",
+                  "args": {
+                    "cwd": "$item.cwd"
+                  }
+                },
+                {
+                  "label": "Remove",
+                  "icon": "trash",
+                  "style": "destructive",
+                  "on": "forget",
+                  "args": {
+                    "id": "$item.id"
+                  }
+                }
+              ]
+            },
+            "empty": "No Claude Code sessions running. Start one in Terminal and it shows here."
+          },
+          {
+            "row": [
+              {
+                "text": "{$active} working · {$waiting} waiting on you",
+                "size": "xs",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Clear done",
+                "on": "clear",
+                "style": "plain",
+                "size": "s",
+                "when": "$sessions | where:'status':'done' | count"
+              }
+            ],
+            "align": "center",
+            "when": "$sessions"
+          },
+          {
+            "text": "Click a session to copy its resume command.",
+            "size": "xs",
+            "emphasis": "subtle"
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "phone",
+      "layout": {
+        "column": [
+          {
+            "list": "$sessions",
+            "limit": 8,
+            "item": {
+              "cell": "$item.cwd | split:'/' | limit:-1 | join",
+              "subtitle": "{$item.status | map:{working:'Working', waiting:'Needs you', done:'Done', idle:'Ready'}}{$item.message | map:{null:'', else:' · '}}{$item.message}",
+              "status": "$item.status | tone:{working:'accent', waiting:'warn', done:'good', else:'neutral'}",
+              "trailing": {
+                "timer": "$item.started",
+                "format": "short"
+              },
+              "context_menu": [
+                {
+                  "label": "Remove",
+                  "icon": "trash",
+                  "style": "destructive",
+                  "on": "forget",
+                  "args": {
+                    "id": "$item.id"
+                  }
+                }
+              ]
+            },
+            "empty": "No Claude Code sessions. When one runs on your Mac it shows here."
+          },
+          {
+            "row": [
+              {
+                "text": "{$active} working · {$waiting} waiting on you",
+                "size": "xs",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Clear done",
+                "on": "clear",
+                "style": "plain",
+                "size": "s",
+                "when": "$sessions | where:'status':'done' | count"
+              }
+            ],
+            "align": "center",
+            "when": "$sessions"
+          },
+          {
+            "text": "From your Mac, while TailApps is open there.",
+            "size": "xs",
+            "emphasis": "subtle"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "sparkles",
+      "label": "{$active} working{$waiting | map:{0:'', else:' · '}}{$waiting | map:{0:''}}{$waiting | map:{0:'', else:' need you'}}",
+      "label_tone": "$mood | tone:{waiting:'warn', busy:'accent', else:'neutral'}",
+      "label_icon": "$mood | map:{waiting:'bubble.left.and.bubble.right', busy:'hammer', else:'sparkles'}",
+      "in_menu": "row",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    },
+    "phone": {
+      "card": "phone"
+    }
+  }
+}

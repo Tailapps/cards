@@ -1,0 +1,975 @@
+{
+  "schema": "tailapps/v0",
+  "app": "timers",
+  "name": "Timers",
+  "description": "As many timers as you like, each with its own colour and alarm. Type 4:30, 25 or \"Tea 10 min\" to start one. Alarms ring with TailApps closed; with sync on, timers run on all your devices.",
+  "icon": "timer",
+  "version": 2,
+  "on_sync": "resync",
+  "permissions": [
+    "notify"
+  ],
+  "state": {
+    "timers": {
+      "type": "list",
+      "sync": true,
+      "default": [
+        {
+          "id": "tea",
+          "name": "Tea",
+          "length": 240,
+          "left": 240,
+          "ends_at": 0,
+          "status": "idle",
+          "hue": "teal",
+          "alarm": true
+        },
+        {
+          "id": "pasta",
+          "name": "Pasta",
+          "length": 600,
+          "left": 600,
+          "ends_at": 0,
+          "status": "idle",
+          "hue": "green",
+          "alarm": true
+        },
+        {
+          "id": "plank",
+          "name": "Plank",
+          "length": 60,
+          "left": 60,
+          "ends_at": 0,
+          "status": "idle",
+          "hue": "red",
+          "alarm": true
+        },
+        {
+          "id": "focus",
+          "name": "Focus",
+          "length": 1500,
+          "left": 1500,
+          "ends_at": 0,
+          "status": "idle",
+          "hue": "blue",
+          "alarm": true
+        }
+      ]
+    },
+    "entry": {
+      "type": "text",
+      "default": ""
+    },
+    "picked": {
+      "type": "any",
+      "default": null
+    },
+    "last_ends": {
+      "type": "number",
+      "default": 0
+    },
+    "new_id": {
+      "type": "text",
+      "default": ""
+    },
+    "new_name": {
+      "type": "text",
+      "default": ""
+    },
+    "new_len": {
+      "type": "number",
+      "default": 0
+    },
+    "ring": {
+      "type": "bool",
+      "default": true
+    },
+    "same": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "field": "New timer",
+                "type": "text",
+                "bind": "$entry",
+                "placeholder": "Try 4:30, 25 or Tea 10 min",
+                "on_submit": "add",
+                "grow": true
+              },
+              {
+                "button": "Add",
+                "icon": "plus",
+                "icon_only": true,
+                "style": "primary",
+                "on": "add",
+                "disabled": "$entry | seconds | map:{null:true, else:false}"
+              }
+            ],
+            "align": "end",
+            "gap": "s",
+            "when": "$picked | map:{null:true, else:false}"
+          },
+          {
+            "list": "$timers",
+            "item": {
+              "column": [
+                {
+                  "row": [
+                    {
+                      "timer": "$item.ends_at",
+                      "mode": "until",
+                      "size": "xxl",
+                      "grow": true,
+                      "when": "$item.status | map:{running:true, else:false}"
+                    },
+                    {
+                      "text": "$item.left | duration:'clock'",
+                      "size": "xxl",
+                      "grow": true,
+                      "when": "$item.status | map:{running:false, else:true}"
+                    },
+                    {
+                      "button": "Restart",
+                      "icon": "arrow.counterclockwise",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "restart",
+                      "args": {
+                        "id": "$item.id",
+                        "length": "$item.length",
+                        "ends_at": "$item.ends_at"
+                      },
+                      "size": "l"
+                    },
+                    {
+                      "button": "Start",
+                      "icon": "play.fill",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "start",
+                      "args": {
+                        "id": "$item.id",
+                        "left": "$item.left",
+                        "length": "$item.length",
+                        "name": "$item.name",
+                        "alarm": "$item.alarm"
+                      },
+                      "size": "l",
+                      "when": "$item.status | map:{running:false, else:true}"
+                    },
+                    {
+                      "button": "Pause",
+                      "icon": "pause.fill",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "pause",
+                      "args": {
+                        "id": "$item.id",
+                        "ends_at": "$item.ends_at"
+                      },
+                      "size": "l",
+                      "when": "$item.status | map:{running:true, else:false}"
+                    }
+                  ],
+                  "align": "center",
+                  "gap": "s"
+                },
+                {
+                  "row": [
+                    {
+                      "text": "$item.name",
+                      "emphasis": "strong"
+                    },
+                    {
+                      "button": "Alarm",
+                      "icon": "$item.alarm | map:{true:'bell.fill', else:'bell.slash'}",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "alarm",
+                      "args": {
+                        "id": "$item.id",
+                        "alarm": "$item.alarm",
+                        "status": "$item.status",
+                        "ends_at": "$item.ends_at",
+                        "name": "$item.name"
+                      }
+                    },
+                    {
+                      "text": "$item.length | duration",
+                      "size": "s",
+                      "emphasis": "subtle"
+                    },
+                    {
+                      "text": "$item.ends_at | time",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "when": "$item.status | map:{running:true, else:false}"
+                    },
+                    {
+                      "text": "$item.left | add:$now | time",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "when": "$item.status | map:{running:false, else:true}"
+                    },
+                    {
+                      "spacer": true
+                    },
+                    {
+                      "button": "Open",
+                      "icon": "arrow.up.left.and.arrow.down.right",
+                      "icon_only": true,
+                      "style": "plain",
+                      "on": "open",
+                      "args": {
+                        "index": "$index"
+                      }
+                    }
+                  ],
+                  "align": "center",
+                  "gap": "s"
+                }
+              ],
+              "style": "tile",
+              "hue": "$item.hue",
+              "gap": "xs"
+            },
+            "empty": "No timers. Type a length like 4:30 above.",
+            "when": "$picked | map:{null:true, else:false}"
+          },
+          {
+            "section": "Quick start",
+            "collapsible": true,
+            "collapsed": true,
+            "children": [
+              {
+                "row": [
+                  {
+                    "button": "1 min",
+                    "on": "quick",
+                    "args": {
+                      "length": 60,
+                      "name": "Timer"
+                    },
+                    "style": "secondary"
+                  },
+                  {
+                    "button": "3 min",
+                    "on": "quick",
+                    "args": {
+                      "length": 180,
+                      "name": "Tea"
+                    },
+                    "style": "secondary"
+                  },
+                  {
+                    "button": "5 min",
+                    "on": "quick",
+                    "args": {
+                      "length": 300,
+                      "name": "Break"
+                    },
+                    "style": "secondary"
+                  },
+                  {
+                    "button": "10 min",
+                    "on": "quick",
+                    "args": {
+                      "length": 600,
+                      "name": "Timer"
+                    },
+                    "style": "secondary"
+                  },
+                  {
+                    "button": "25 min",
+                    "on": "quick",
+                    "args": {
+                      "length": 1500,
+                      "name": "Focus"
+                    },
+                    "style": "secondary"
+                  }
+                ],
+                "wrap": true,
+                "gap": "s"
+              }
+            ],
+            "when": "$picked | map:{null:true, else:false}"
+          },
+          {
+            "column": [
+              {
+                "row": [
+                  {
+                    "button": "All timers",
+                    "icon": "chevron.left",
+                    "style": "plain",
+                    "on": "close"
+                  },
+                  {
+                    "spacer": true
+                  },
+                  {
+                    "text": "$timers | pick:$picked | pick:'length' | duration",
+                    "size": "s",
+                    "emphasis": "subtle"
+                  }
+                ],
+                "align": "center"
+              },
+              {
+                "row": [
+                  {
+                    "timer": "$timers | pick:$picked | pick:'ends_at'",
+                    "mode": "until",
+                    "size": "xxl",
+                    "grow": true,
+                    "when": "$timers | pick:$picked | pick:'status' | map:{running:true, else:false}"
+                  },
+                  {
+                    "text": "$timers | pick:$picked | pick:'left' | duration:'clock'",
+                    "size": "xxl",
+                    "grow": true,
+                    "when": "$timers | pick:$picked | pick:'status' | map:{running:false, else:true}"
+                  }
+                ],
+                "align": "center"
+              },
+              {
+                "row": [
+                  {
+                    "text": "$timers | pick:$picked | pick:'name'",
+                    "size": "l",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "spacer": true
+                  },
+                  {
+                    "text": "$timers | pick:$picked | pick:'ends_at' | time",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$timers | pick:$picked | pick:'status' | map:{running:true, else:false}"
+                  },
+                  {
+                    "text": "$timers | pick:$picked | pick:'left' | add:$now | time",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$timers | pick:$picked | pick:'status' | map:{running:false, else:true}"
+                  }
+                ],
+                "align": "center",
+                "gap": "s"
+              }
+            ],
+            "style": "tile",
+            "hue": "$timers | pick:$picked | pick:'hue'",
+            "gap": "s",
+            "when": "$picked | map:{null:false, else:true}"
+          },
+          {
+            "row": [
+              {
+                "spacer": true
+              },
+              {
+                "button": "Alarm",
+                "icon": "$timers | pick:$picked | pick:'alarm' | map:{true:'bell.fill', else:'bell.slash'}",
+                "icon_only": true,
+                "style": "plain",
+                "on": "alarm",
+                "args": {
+                  "id": "$timers | pick:$picked | pick:'id'",
+                  "alarm": "$timers | pick:$picked | pick:'alarm'",
+                  "status": "$timers | pick:$picked | pick:'status'",
+                  "ends_at": "$timers | pick:$picked | pick:'ends_at'",
+                  "name": "$timers | pick:$picked | pick:'name'"
+                },
+                "size": "l"
+              },
+              {
+                "button": "Restart",
+                "icon": "arrow.counterclockwise",
+                "icon_only": true,
+                "style": "plain",
+                "on": "restart",
+                "args": {
+                  "id": "$timers | pick:$picked | pick:'id'",
+                  "length": "$timers | pick:$picked | pick:'length'",
+                  "ends_at": "$timers | pick:$picked | pick:'ends_at'"
+                },
+                "size": "l"
+              },
+              {
+                "button": "Start",
+                "icon": "play.fill",
+                "icon_only": true,
+                "style": "plain",
+                "on": "start",
+                "args": {
+                  "id": "$timers | pick:$picked | pick:'id'",
+                  "left": "$timers | pick:$picked | pick:'left'",
+                  "length": "$timers | pick:$picked | pick:'length'",
+                  "name": "$timers | pick:$picked | pick:'name'",
+                  "alarm": "$timers | pick:$picked | pick:'alarm'"
+                },
+                "size": "l",
+                "when": "$timers | pick:$picked | pick:'status' | map:{running:false, else:true}"
+              },
+              {
+                "button": "Pause",
+                "icon": "pause.fill",
+                "icon_only": true,
+                "style": "plain",
+                "on": "pause",
+                "args": {
+                  "id": "$timers | pick:$picked | pick:'id'",
+                  "ends_at": "$timers | pick:$picked | pick:'ends_at'"
+                },
+                "size": "l",
+                "when": "$timers | pick:$picked | pick:'status' | map:{running:true, else:false}"
+              },
+              {
+                "spacer": true
+              }
+            ],
+            "align": "center",
+            "gap": "l",
+            "when": "$picked | map:{null:false, else:true}"
+          },
+          {
+            "section": "Edit",
+            "collapsible": true,
+            "collapsed": true,
+            "when": "$picked | map:{null:false, else:true}",
+            "children": [
+              {
+                "field": "Colour",
+                "type": "color",
+                "value": "$timers | pick:$picked | pick:'hue'",
+                "on_change": "recolour"
+              },
+              {
+                "button": "Delete timer",
+                "style": "destructive",
+                "on": "delete",
+                "args": {
+                  "id": "$timers | pick:$picked | pick:'id'",
+                  "ends_at": "$timers | pick:$picked | pick:'ends_at'"
+                },
+                "confirm": "Delete {$timers | pick:$picked | pick:'name'}?"
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "add": {
+      "steps": [
+        {
+          "if": "$entry | seconds",
+          "then": [
+            {
+              "set": {
+                "new_id": "t{$now}-{$timers | count}",
+                "new_name": "$entry | seconds:'rest' | default:'Timer'",
+                "new_len": "$entry | seconds"
+              }
+            },
+            {
+              "push": {
+                "timers": {
+                  "id": "$new_id",
+                  "name": "$new_name",
+                  "length": "$new_len",
+                  "left": "$new_len",
+                  "ends_at": "$now | add:$new_len",
+                  "status": "running",
+                  "hue": "$timers | count | map:{0:'blue', 1:'green', 2:'red', 3:'orange', 4:'purple', 5:'teal', 6:'pink', 7:'indigo', 8:'mint', else:'brown'}",
+                  "alarm": true
+                }
+              },
+              "at": "end"
+            },
+            {
+              "notify": {
+                "title": "$new_name",
+                "body": "Time's up",
+                "at": "$now | add:$new_len",
+                "id": "$new_id"
+              }
+            },
+            {
+              "set": {
+                "last_ends": "$now | add:$new_len"
+              }
+            },
+            {
+              "set": {
+                "entry": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "quick": {
+      "args": {
+        "length": "number",
+        "name": "text"
+      },
+      "steps": [
+        {
+          "set": {
+            "new_id": "t{$now}-{$timers | count}",
+            "new_name": "$args.name",
+            "new_len": "$args.length"
+          }
+        },
+        {
+          "push": {
+            "timers": {
+              "id": "$new_id",
+              "name": "$new_name",
+              "length": "$new_len",
+              "left": "$new_len",
+              "ends_at": "$now | add:$new_len",
+              "status": "running",
+              "hue": "$timers | count | map:{0:'blue', 1:'green', 2:'red', 3:'orange', 4:'purple', 5:'teal', 6:'pink', 7:'indigo', 8:'mint', else:'brown'}",
+              "alarm": true
+            }
+          },
+          "at": "end"
+        },
+        {
+          "notify": {
+            "title": "$new_name",
+            "body": "Time's up",
+            "at": "$now | add:$new_len",
+            "id": "$new_id"
+          }
+        },
+        {
+          "set": {
+            "last_ends": "$now | add:$new_len"
+          }
+        }
+      ]
+    },
+    "start": {
+      "args": {
+        "id": "text",
+        "left": "number",
+        "length": "number",
+        "name": "text",
+        "alarm": "bool"
+      },
+      "steps": [
+        {
+          "set": {
+            "new_len": "$args.left"
+          }
+        },
+        {
+          "if": "$new_len | map:{0:true, null:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "new_len": "$args.length"
+              }
+            }
+          ]
+        },
+        {
+          "update": {
+            "timers": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "status": "running",
+                "ends_at": "$now | add:$new_len",
+                "left": "$new_len"
+              }
+            }
+          }
+        },
+        {
+          "if": "$args.alarm",
+          "then": [
+            {
+              "notify": {
+                "title": "$args.name",
+                "body": "Time's up",
+                "at": "$now | add:$new_len",
+                "id": "$args.id"
+              }
+            }
+          ]
+        },
+        {
+          "set": {
+            "last_ends": "$now | add:$new_len"
+          }
+        }
+      ]
+    },
+    "pause": {
+      "args": {
+        "id": "text",
+        "ends_at": "number"
+      },
+      "steps": [
+        {
+          "set": {
+            "new_len": "$args.ends_at"
+          }
+        },
+        {
+          "increment": {
+            "new_len": "-$now"
+          },
+          "min": 0
+        },
+        {
+          "update": {
+            "timers": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "status": "paused",
+                "left": "$new_len",
+                "ends_at": 0
+              }
+            }
+          }
+        },
+        {
+          "notify": {
+            "cancel": "$args.id"
+          }
+        },
+        {
+          "set": {
+            "same": [
+              "$last_ends"
+            ]
+          }
+        },
+        {
+          "remove": {
+            "same": {
+              "match": "$args.ends_at"
+            }
+          }
+        },
+        {
+          "if": "$same | count | map:{0:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "last_ends": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "restart": {
+      "args": {
+        "id": "text",
+        "length": "number",
+        "ends_at": "number"
+      },
+      "steps": [
+        {
+          "update": {
+            "timers": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "status": "idle",
+                "left": "$args.length",
+                "ends_at": 0
+              }
+            }
+          }
+        },
+        {
+          "notify": {
+            "cancel": "$args.id"
+          }
+        },
+        {
+          "set": {
+            "same": [
+              "$last_ends"
+            ]
+          }
+        },
+        {
+          "remove": {
+            "same": {
+              "match": "$args.ends_at"
+            }
+          }
+        },
+        {
+          "if": "$same | count | map:{0:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "last_ends": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "alarm": {
+      "args": {
+        "id": "text",
+        "alarm": "bool",
+        "status": "text",
+        "ends_at": "number",
+        "name": "text"
+      },
+      "steps": [
+        {
+          "set": {
+            "ring": "$args.alarm | map:{true:false, else:true}"
+          }
+        },
+        {
+          "update": {
+            "timers": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "alarm": "$ring"
+              }
+            }
+          }
+        },
+        {
+          "notify": {
+            "cancel": "$args.id"
+          }
+        },
+        {
+          "set": {
+            "new_len": "$args.ends_at"
+          }
+        },
+        {
+          "increment": {
+            "new_len": "-$now"
+          },
+          "min": 0
+        },
+        {
+          "if": "$ring",
+          "then": [
+            {
+              "if": "$args.status | map:{running:true, else:false}",
+              "then": [
+                {
+                  "if": "$new_len",
+                  "then": [
+                    {
+                      "notify": {
+                        "title": "$args.name",
+                        "body": "Time's up",
+                        "at": "$args.ends_at",
+                        "id": "$args.id"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "open": {
+      "args": {
+        "index": "int"
+      },
+      "steps": [
+        {
+          "set": {
+            "picked": "$args.index"
+          }
+        }
+      ]
+    },
+    "close": {
+      "steps": [
+        {
+          "set": {
+            "picked": null
+          }
+        }
+      ]
+    },
+    "recolour": {
+      "steps": [
+        {
+          "update": {
+            "timers": {
+              "match": {
+                "id": "$timers | pick:$picked | pick:'id'"
+              },
+              "set": {
+                "hue": "$args.value"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "delete": {
+      "args": {
+        "id": "text",
+        "ends_at": "number"
+      },
+      "steps": [
+        {
+          "notify": {
+            "cancel": "$args.id"
+          }
+        },
+        {
+          "remove": {
+            "timers": {
+              "match": {
+                "id": "$args.id"
+              }
+            }
+          }
+        },
+        {
+          "set": {
+            "picked": null
+          }
+        },
+        {
+          "set": {
+            "same": [
+              "$last_ends"
+            ]
+          }
+        },
+        {
+          "remove": {
+            "same": {
+              "match": "$args.ends_at"
+            }
+          }
+        },
+        {
+          "if": "$same | count | map:{0:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "last_ends": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "resync": {
+      "steps": [
+        {
+          "each": "$args.previous.timers",
+          "do": [
+            {
+              "notify": {
+                "cancel": "$item.id"
+              }
+            }
+          ]
+        },
+        {
+          "set": {
+            "last_ends": 0
+          }
+        },
+        {
+          "each": "$timers",
+          "do": [
+            {
+              "if": "$item.status | map:{running:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "new_len": "$item.ends_at"
+                  }
+                },
+                {
+                  "increment": {
+                    "new_len": "-$now"
+                  },
+                  "min": 0
+                },
+                {
+                  "if": "$new_len",
+                  "then": [
+                    {
+                      "set": {
+                        "last_ends": "$item.ends_at"
+                      }
+                    },
+                    {
+                      "if": "$item.alarm",
+                      "then": [
+                        {
+                          "notify": {
+                            "title": "$item.name",
+                            "body": "Time's up",
+                            "at": "$item.ends_at",
+                            "id": "$item.id"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "timer",
+      "label": "$last_ends | until",
+      "label_tone": "accent",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "narrow"
+    }
+  },
+  "style": {
+    "accent": "#3b82f6"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "schema": "tailapps/v0",
+  "app": "transcribe-file",
+  "name": "Transcribe a File",
+  "description": "Drop a voice memo or any audio file (on iPhone, tap to choose one) and get its text, made on this device. Copy it with one click.",
+  "icon": "waveform",
+  "permissions": [
+    "speech.transcribe",
+    "clipboard.write"
+  ],
+  "state": {
+    "text": {
+      "type": "text",
+      "default": ""
+    },
+    "name": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "drop": "Drop an audio file",
+            "on": "transcribe",
+            "accept": [
+              "audio"
+            ],
+            "hint": "Voice memos, m4a, mp3, wav or aiff",
+            "size": "l",
+            "when": "$text | count | map:{0:true, else:false}"
+          },
+          {
+            "drop": "Drop another file",
+            "on": "transcribe",
+            "accept": [
+              "audio"
+            ],
+            "size": "s",
+            "when": "$text"
+          },
+          {
+            "column": [
+              {
+                "cell": "$name",
+                "subtitle": "Made on this device",
+                "leading": "text.quote",
+                "trailing": {
+                  "row": [
+                    {
+                      "button": "Copy",
+                      "on": "copy",
+                      "icon": "doc.on.doc",
+                      "icon_only": true,
+                      "style": "plain"
+                    },
+                    {
+                      "button": "Clear",
+                      "on": "clear",
+                      "icon": "xmark",
+                      "icon_only": true,
+                      "style": "plain"
+                    }
+                  ],
+                  "gap": "xs"
+                }
+              },
+              {
+                "text": "$text",
+                "lines": 12
+              }
+            ],
+            "style": "inset",
+            "when": "$text"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "transcribe": {
+      "timeout": 600,
+      "steps": [
+        {
+          "speech.transcribe": "$args.files.0.path",
+          "as": "heard"
+        },
+        {
+          "set": {
+            "text": "$heard.text | default:'(No speech found)'",
+            "name": "$args.files.0.name"
+          }
+        }
+      ]
+    },
+    "copy": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$text"
+          }
+        }
+      ]
+    },
+    "clear": {
+      "steps": [
+        {
+          "set": {
+            "text": "",
+            "name": ""
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "waveform",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    },
+    "phone": {
+      "card": "main"
+    }
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "schema": "tailapps/v0",
+  "app": "my-day",
+  "name": "My Day",
+  "description": "Today's events with a Join button for meeting links, a countdown to the next one in the menu bar, a heads-up two minutes before each, and your open reminders to tick off or add to.",
+  "icon": "calendar",
+  "version": 1,
+  "permissions": ["calendar.read", "reminders.read", "reminders.write", "open:url", "notify"],
+  "settings": {
+    "calendars": { "type": "calendar.calendars", "label": "Calendars to show" },
+    "list": { "type": "reminders.lists", "label": "Reminders list" }
+  },
+  "state": {
+    "today": { "type": "list", "default": [] },
+    "todo": { "type": "list", "default": [] },
+    "draft": { "type": "text", "default": "" }
+  },
+  "sources": {
+    "today": { "calendar": { "days": 1, "calendars": "$settings.calendars" } },
+    "todo": { "reminders": { "list": "$settings.list", "done": false } }
+  },
+  "alarms": {
+    "heads_up": { "at": "$today | where:{all_day:false}", "time": "$item.start", "before": 120, "action": "warn" }
+  },
+  "actions": {
+    "warn": {
+      "steps": [
+        { "notify": { "title": "$args.item.title", "body": "Starts in 2 minutes" } }
+      ]
+    },
+    "join": {
+      "steps": [
+        {
+          "if": "$args.item.join",
+          "then": [{ "open": "$args.item.join" }],
+          "else": [{ "toast": "This event has no meeting link" }]
+        }
+      ]
+    },
+    "tick": {
+      "args": { "id": "text" },
+      "steps": [
+        { "reminders.done": { "id": "$args.id", "done": "$args.value" } }
+      ]
+    },
+    "add": {
+      "steps": [
+        {
+          "if": "$draft",
+          "then": [
+            { "reminders.add": { "title": "$draft", "list": "$settings.list" } },
+            { "set": { "draft": "" } }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "calendar",
+      "label": "{$today | where:{all_day:false, ongoing:false} | pick:0 | pick:'start' | until:'short'}",
+      "card": "main"
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "calendar": "$today",
+            "view": "agenda",
+            "days": 1,
+            "limit": 12,
+            "on_select": "join",
+            "select_label": "Join"
+          },
+          {
+            "section": "Reminders",
+            "children": [
+              {
+                "field": "",
+                "type": "text",
+                "bind": "$draft",
+                "placeholder": "Add a reminder…",
+                "on_submit": "add"
+              },
+              {
+                "column": [
+                  {
+                    "list": "$todo",
+                    "limit": 20,
+                    "empty": "Nothing left to do.",
+                    "item": {
+                      "cell": "$item.title",
+                      "subtitle": "$item.due | date:'short'",
+                      "check": "$item.done",
+                      "on_check": "tick",
+                      "args": { "id": "$item.id" }
+                    }
+                  }
+                ],
+                "style": "inset"
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ]
+}

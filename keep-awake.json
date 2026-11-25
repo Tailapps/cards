@@ -1,0 +1,87 @@
+{
+  "schema": "tailapps/v0",
+  "app": "keep-awake",
+  "name": "Keep Awake",
+  "description": "Keep this Mac (or the iPhone's screen) awake for a while or until you stop, with no script. The Mac lets go by itself when the time is up or TailApps quits.",
+  "icon": "cup.and.saucer",
+  "version": 1,
+  "permissions": ["power.control"],
+  "state": {
+    "mode": { "type": "text", "default": "off" },
+    "until": { "type": "number", "default": 0 },
+    "display": { "type": "bool", "default": true }
+  },
+  "actions": {
+    "awake_for": {
+      "args": { "minutes": "int:1-1440", "seconds": "int:60-86400" },
+      "steps": [
+        { "awake.start": { "display": "$display", "minutes": "$args.minutes" } },
+        { "set": { "mode": "timed", "until": "$now" } },
+        { "increment": { "until": "$args.seconds" } }
+      ]
+    },
+    "awake_on": { "expose": true,
+      "steps": [
+        { "awake.start": { "display": "$display" } },
+        { "set": { "mode": "on", "until": 0 } }
+      ]
+    },
+    "awake_off": { "expose": true,
+      "steps": [
+        { "awake.stop": {} },
+        { "set": { "mode": "off", "until": 0 } }
+      ]
+    },
+    "ended": {
+      "steps": [
+        { "set": { "mode": "off", "until": 0 } }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              { "icon": "$mode | map:{off:'moon.zzz', else:'cup.and.saucer.fill'}", "tone": "$mode | tone:{off:'neutral', else:'good'}", "size": "l" },
+              {
+                "column": [
+                  { "text": "$mode | map:{off:'Sleeps as usual', else:'Staying awake'}", "emphasis": "strong" },
+                  { "timer": "$until", "mode": "until", "size": "s", "when": "$mode | map:{timed:true, else:false}", "on_end": "ended" },
+                  { "text": "Until you stop it or TailApps quits", "size": "s", "emphasis": "subtle", "when": "$mode | map:{on:true, else:false}" }
+                ],
+                "gap": "xs"
+              }
+            ],
+            "align": "center",
+            "gap": "m"
+          },
+          {
+            "grid": [
+              { "button": "30 min", "on": "awake_for", "args": { "minutes": 30, "seconds": 1800 }, "style": "secondary" },
+              { "button": "1 hour", "on": "awake_for", "args": { "minutes": 60, "seconds": 3600 }, "style": "secondary" },
+              { "button": "2 hours", "on": "awake_for", "args": { "minutes": 120, "seconds": 7200 }, "style": "secondary" },
+              { "button": "Until I stop", "on": "awake_on", "style": "secondary" }
+            ],
+            "columns": { "default": 4, "narrow": 2 },
+            "gap": "s"
+          },
+          { "button": "Let it sleep", "on": "awake_off", "style": "destructive", "grow": true, "when": "$mode | map:{off:false, else:true}" },
+          { "field": "Keep the screen on too", "type": "toggle", "bind": "$display", "platforms": ["macos"] }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "cup.and.saucer",
+      "label": "{$until | until}",
+      "label_icon": "$mode | map:{off:'cup.and.saucer', else:'cup.and.saucer.fill'}",
+      "card": "main"
+    },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

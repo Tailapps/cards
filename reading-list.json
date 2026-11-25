@@ -1,0 +1,381 @@
+{
+  "schema": "tailapps/v0",
+  "app": "reading-list",
+  "name": "Reading List",
+  "description": "Things to read, in two tabs. Swipe a row to mark it read or delete it (with Undo), right-click or long press to rename or file it, pull down on the iPhone to refresh.",
+  "icon": "books.vertical",
+  "version": 1,
+  "permissions": [],
+  "state": {
+    "links": {
+      "type": "list",
+      "default": [
+        {
+          "id": "1",
+          "title": "The Pragmatic Programmer, chapter 3",
+          "shelf": "Books",
+          "done": false
+        },
+        {
+          "id": "2",
+          "title": "Swift concurrency in practice",
+          "shelf": "Articles",
+          "done": false
+        },
+        {
+          "id": "3",
+          "title": "Laravel 13 release notes",
+          "shelf": "Articles",
+          "done": false
+        },
+        {
+          "id": "4",
+          "title": "Designing Data-Intensive Applications",
+          "shelf": "Books",
+          "done": true
+        }
+      ]
+    }
+  },
+  "actions": {
+    "add": {
+      "steps": [
+        {
+          "ask": {
+            "title": "Add to your reading list",
+            "message": "What do you want to read?",
+            "input": "text"
+          },
+          "as": "title"
+        },
+        {
+          "if": "$title",
+          "then": [
+            {
+              "push": {
+                "links": {
+                  "id": "{$now}-{$links | count}",
+                  "title": "$title",
+                  "shelf": "Inbox",
+                  "done": false
+                }
+              },
+              "at": "front"
+            },
+            {
+              "toast": "Added"
+            }
+          ]
+        }
+      ]
+    },
+    "mark_read": {
+      "steps": [
+        {
+          "update": {
+            "links": {
+              "match": {
+                "id": "$args.item.id"
+              },
+              "set": {
+                "done": true
+              }
+            }
+          }
+        },
+        {
+          "toast": "Marked as read"
+        }
+      ]
+    },
+    "mark_unread": {
+      "steps": [
+        {
+          "update": {
+            "links": {
+              "match": {
+                "id": "$args.item.id"
+              },
+              "set": {
+                "done": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "remove_link": {
+      "steps": [
+        {
+          "remove": {
+            "links": {
+              "match": {
+                "id": "$args.item.id"
+              }
+            }
+          }
+        },
+        {
+          "toast": {
+            "text": "Deleted “{$args.item.title}”",
+            "undo": "restore",
+            "args": {
+              "id": "$args.item.id",
+              "title": "$args.item.title",
+              "shelf": "$args.item.shelf",
+              "done": "$args.item.done"
+            }
+          }
+        }
+      ]
+    },
+    "restore": {
+      "args": {
+        "id": "text",
+        "title": "text",
+        "shelf": "text",
+        "done": "bool"
+      },
+      "steps": [
+        {
+          "push": {
+            "links": {
+              "id": "$args.id",
+              "title": "$args.title",
+              "shelf": "$args.shelf",
+              "done": "$args.done"
+            }
+          },
+          "at": "front"
+        }
+      ]
+    },
+    "rename": {
+      "args": {
+        "id": "text",
+        "title": "text"
+      },
+      "steps": [
+        {
+          "ask": {
+            "title": "Rename",
+            "input": "text",
+            "default": "$args.title"
+          },
+          "as": "name"
+        },
+        {
+          "if": "$name",
+          "then": [
+            {
+              "update": {
+                "links": {
+                  "match": {
+                    "id": "$args.id"
+                  },
+                  "set": {
+                    "title": "$name"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "move": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "ask": {
+            "title": "Move to",
+            "choices": [
+              "Inbox",
+              "Books",
+              "Articles",
+              "Videos"
+            ]
+          },
+          "as": "shelf"
+        },
+        {
+          "update": {
+            "links": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "shelf": "$shelf"
+              }
+            }
+          }
+        },
+        {
+          "toast": "Moved to {$shelf}"
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "tabs": [
+              {
+                "label": "To read",
+                "icon": "book",
+                "count": "$links | where:{done:false} | count",
+                "children": [
+                  {
+                    "column": [
+                      {
+                        "list": "$links | where:{done:false}",
+                        "empty": "Nothing to read. Add something.",
+                        "group": "$item.shelf",
+                        "swipe": {
+                          "leading": [
+                            {
+                              "label": "Read",
+                              "icon": "checkmark",
+                              "hue": "green",
+                              "on": "mark_read"
+                            }
+                          ],
+                          "trailing": [
+                            {
+                              "label": "Delete",
+                              "icon": "trash",
+                              "style": "destructive",
+                              "on": "remove_link"
+                            }
+                          ]
+                        },
+                        "item": {
+                          "cell": "$item.title",
+                          "subtitle": "$item.shelf",
+                          "leading": "book",
+                          "context_menu": [
+                            {
+                              "label": "Rename…",
+                              "icon": "pencil",
+                              "on": "rename",
+                              "args": {
+                                "id": "$item.id",
+                                "title": "$item.title"
+                              }
+                            },
+                            {
+                              "label": "Move to…",
+                              "icon": "folder",
+                              "on": "move",
+                              "args": {
+                                "id": "$item.id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "style": "inset"
+                  }
+                ]
+              },
+              {
+                "label": "Read",
+                "icon": "checkmark.circle",
+                "children": [
+                  {
+                    "column": [
+                      {
+                        "list": "$links | where:{done:true}",
+                        "empty": "Nothing read yet",
+                        "swipe": {
+                          "leading": [
+                            {
+                              "label": "Unread",
+                              "icon": "arrow.uturn.backward",
+                              "hue": "blue",
+                              "on": "mark_unread"
+                            }
+                          ],
+                          "trailing": [
+                            {
+                              "label": "Delete",
+                              "icon": "trash",
+                              "style": "destructive",
+                              "on": "remove_link"
+                            }
+                          ]
+                        },
+                        "item": {
+                          "cell": "$item.title",
+                          "subtitle": "$item.shelf",
+                          "leading": "book",
+                          "context_menu": [
+                            {
+                              "label": "Rename…",
+                              "icon": "pencil",
+                              "on": "rename",
+                              "args": {
+                                "id": "$item.id",
+                                "title": "$item.title"
+                              }
+                            },
+                            {
+                              "label": "Move to…",
+                              "icon": "folder",
+                              "on": "move",
+                              "args": {
+                                "id": "$item.id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "style": "inset"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          {
+            "text": "{$links | where:{done:false} | count} to read",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "spacer": true
+          },
+          {
+            "button": "Add",
+            "icon": "plus",
+            "style": "plain",
+            "on": "add"
+          }
+        ],
+        "align": "center"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "books.vertical",
+      "label": "{$links | where:{done:false} | count}",
+      "in_menu": "card"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

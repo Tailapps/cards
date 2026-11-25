@@ -1,0 +1,90 @@
+{
+  "schema": "tailapps/v0",
+  "app": "ci-run",
+  "name": "CI run",
+  "description": "The latest GitHub Actions run of a repo, job by job. Checks from your Mac with the GitHub CLI; for your iPhone too, turn on \"Show on my other devices\" there, then Sync to My Devices.",
+  "version": 2,
+  "icon": "checklist",
+  "permissions": [
+    "script:latest-run.sh",
+    "uses:gh",
+    "open:url",
+    "inbox:run",
+    "send:run"
+  ],
+  "settings": {
+    "repo": { "type": "text", "label": "Repository (owner/name)", "required": true, "platforms": ["macos"] },
+    "share": { "type": "toggle", "label": "Show on my other devices", "default": false, "platforms": ["macos"] }
+  },
+  "scripts": {
+    "latest-run.sh": "#!/bin/sh\n# The latest GitHub Actions run of repo $1 (owner/name) with its jobs, as JSON. Needs the GitHub CLI, signed in.\n# The run gets a state (running, passed, failed or cancelled), and each job one the steps part reads:\n# done, failed, skipped, active or pending. The app passes -- first, so a repo name is never read as a flag.\n[ \"$1\" = \"--\" ] && shift\nrun=$(gh run list --repo \"$1\" --limit 1 --json databaseId --jq '.[0].databaseId') || exit 1\nif [ -z \"$run\" ]; then\n  echo '{\"jobs\":[]}'\n  exit 0\nfi\ngh run view \"$run\" --repo \"$1\" --json displayTitle,headBranch,status,conclusion,url,createdAt,jobs --jq '{\n  title: .displayTitle, branch: .headBranch, url, created: .createdAt,\n  state: (if .status != \"completed\" then \"running\"\n    elif .conclusion == \"success\" then \"passed\"\n    elif .conclusion == \"cancelled\" or .conclusion == \"skipped\" then \"cancelled\"\n    else \"failed\" end),\n  jobs: [.jobs[] | {name, url, started: .startedAt, state: (\n    if .conclusion == \"success\" then \"done\"\n    elif .conclusion == \"failure\" or .conclusion == \"timed_out\" then \"failed\"\n    elif .conclusion == \"skipped\" or .conclusion == \"cancelled\" then \"skipped\"\n    elif .status == \"in_progress\" then \"active\"\n    else \"pending\" end)}]\n}'\n"
+  },
+  "state": {
+    "run": { "type": "object", "default": { "jobs": [] } }
+  },
+  "sources": {
+    "run": { "script": "latest-run.sh", "args": ["--", "$settings.repo"], "every": 30, "on": "open", "platforms": ["macos"],
+      "on_change": { "action": "report", "watch": "{$run.title}-{$run.created}-{$run.state}" } },
+    "shared": { "inbox": "run", "on_receive": "heard" }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              { "text": "$run.title | default:'No runs yet' | truncate:40", "emphasis": "strong", "grow": true },
+              {
+                "badge": "$run.state | map:{passed:'Passed', failed:'Failed', cancelled:'Cancelled', else:'Running'}",
+                "tone": "$run.state | tone:{passed:'good', failed:'bad', cancelled:'neutral', else:'accent'}",
+                "busy": "$run.state | map:{passed:false, failed:false, cancelled:false, else:true}",
+                "when": "$run.state"
+              }
+            ],
+            "align": "center",
+            "gap": "s"
+          },
+          { "steps": "$run.jobs", "direction": "horizontal", "on_select": "open_job" },
+          {
+            "text": "{$run.branch | default:'—'} · started {$run.created | ago}",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$run.state"
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "actions": {
+    "open_job": {
+      "steps": [{ "open": "$args.item.url" }]
+    },
+    "report": {
+      "steps": [
+        { "if": "$settings.share", "then": [
+          { "if": "$args.previous", "then": [
+            { "send": { "run": "$run" }, "alert": "$run.state | map:{failed:'CI failed', else:''}" }
+          ], "else": [
+            { "send": { "run": "$run" } }
+          ] }
+        ] }
+      ]
+    },
+    "heard": {
+      "steps": [
+        { "if": "$args.event.state", "then": [{ "set": { "run": "$args.event" } }] }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "checklist",
+      "label": "$run.state | map:{passed:'Passed', failed:'Failed', cancelled:'Cancelled', running:'Running', else:'—'}",
+      "label_tone": "$run.state | tone:{passed:'good', failed:'bad', cancelled:'neutral', running:'accent', else:'neutral'}",
+      "label_icon": "$run.state | map:{passed:'checkmark.circle', failed:'xmark.octagon', cancelled:'minus.circle', running:'arrow.triangle.2.circlepath', else:''}",
+      "card": "main"
+    }
+  }
+}

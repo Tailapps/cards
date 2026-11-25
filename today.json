@@ -1,0 +1,123 @@
+{
+  "schema": "tailapps/v0",
+  "app": "today",
+  "name": "Today",
+  "description": "Your shop's day at a glance: orders, revenue, visitors and the latest orders, pushed by your shop's server straight to your iPhone and Mac, even while the Mac sleeps.",
+  "icon": "bag",
+  "version": 1,
+  "permissions": [
+    "inbox:stats"
+  ],
+  "state": {
+    "stats": {
+      "type": "object",
+      "default": {
+        "orders": 0,
+        "revenue": 0,
+        "visitors": 0,
+        "hours": [],
+        "recent": []
+      }
+    }
+  },
+  "sources": {
+    "stats": {
+      "inbox": "stats",
+      "platforms": [
+        "macos",
+        "ios"
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "stat": "$stats.orders | number",
+                "label": "Orders",
+                "grow": true
+              },
+              {
+                "stat": "$stats.revenue | number:2",
+                "label": "Revenue",
+                "grow": true
+              },
+              {
+                "stat": "$stats.visitors | compact",
+                "label": "Visitors",
+                "grow": true
+              }
+            ],
+            "align": "center"
+          },
+          {
+            "chart": "$stats.hours",
+            "kind": "bar",
+            "height": "s",
+            "when": "$stats.hours"
+          },
+          {
+            "section": "Latest orders",
+            "when": "$stats.recent",
+            "children": [
+              {
+                "list": "$stats.recent",
+                "limit": 5,
+                "item": {
+                  "row": [
+                    {
+                      "text": "$item.item | truncate:30",
+                      "size": "s",
+                      "grow": true
+                    },
+                    {
+                      "text": "$item.total | number:2",
+                      "size": "s",
+                      "emphasis": "strong"
+                    },
+                    {
+                      "text": "$item.at | ago",
+                      "size": "xs",
+                      "emphasis": "subtle"
+                    }
+                  ],
+                  "align": "center",
+                  "gap": "s"
+                }
+              }
+            ]
+          },
+          {
+            "text": "Updated {$meta.stats.updated | ago}",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$meta.stats.updated"
+          },
+          {
+            "text": "Waiting for your shop. In Settings, get a push URL for this app, set it to All My Devices, and POST JSON like {\"orders\": 12, \"revenue\": 480.5, \"visitors\": 1310} from your shop's server.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$meta.stats.updated | default:'none' | map:{none:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "bag",
+      "card": "main",
+      "in_menu": "row",
+      "label": "{$stats.orders} orders"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

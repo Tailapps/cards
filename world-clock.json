@@ -1,0 +1,226 @@
+{
+  "schema": "tailapps/v0",
+  "app": "world-clock",
+  "name": "World Clock",
+  "description": "Your cities' times, days and working hours, who's there and how to say hello. Reorder them, slide a day ahead or back to plan a call. Same cities on all your devices.",
+  "icon": "globe",
+  "version": 5,
+  "permissions": ["net:geocoding-api.open-meteo.com"],
+  "state": {
+    "cities": {
+      "type": "list",
+      "sync": true,
+      "default": [
+        { "name": "San Francisco", "country": "United States", "cc": "US", "tz": "America/Los_Angeles" },
+        { "name": "Warsaw", "country": "Poland", "cc": "PL", "tz": "Europe/Warsaw" },
+        { "name": "Helsinki", "country": "Finland", "cc": "FI", "tz": "Europe/Helsinki" },
+        { "name": "Bali", "country": "Indonesia", "cc": "ID", "tz": "Asia/Makassar" }
+      ]
+    },
+    "greetings": {
+      "type": "object",
+      "default": {
+        "JP": { "morning": "おはようございます _ohayō gozaimasu_", "afternoon": "こんにちは _konnichiwa_", "evening": "こんばんは _konbanwa_" },
+        "CN": { "morning": "早上好 _zǎoshang hǎo_", "afternoon": "下午好 _xiàwǔ hǎo_", "evening": "晚上好 _wǎnshang hǎo_" },
+        "KR": { "morning": "좋은 아침이에요 _joeun achimieyo_", "afternoon": "안녕하세요 _annyeonghaseyo_", "evening": "안녕하세요 _annyeonghaseyo_" },
+        "IN": { "morning": "सुप्रभात _suprabhāt_", "afternoon": "नमस्ते _namaste_", "evening": "शुभ संध्या _shubh sandhyā_" },
+        "AE": { "morning": "صباح الخير _sabāḥ al-khayr_", "afternoon": "مرحبا _marḥaban_", "evening": "مساء الخير _masāʾ al-khayr_" },
+        "SA": { "morning": "صباح الخير _sabāḥ al-khayr_", "afternoon": "مرحبا _marḥaban_", "evening": "مساء الخير _masāʾ al-khayr_" },
+        "EG": { "morning": "صباح الخير _sabāḥ al-khayr_", "afternoon": "مرحبا _marḥaban_", "evening": "مساء الخير _masāʾ al-khayr_" },
+        "IL": { "morning": "בוקר טוב _boker tov_", "afternoon": "צהריים טובים _tsohorayim tovim_", "evening": "ערב טוב _erev tov_" },
+        "RU": { "morning": "Доброе утро _dobroye utro_", "afternoon": "Добрый день _dobryy den’_", "evening": "Добрый вечер _dobryy vecher_" },
+        "UA": { "morning": "Доброго ранку _dobroho ranku_", "afternoon": "Добрий день _dobryi den’_", "evening": "Добрий вечір _dobryi vechir_" },
+        "GR": { "morning": "Καλημέρα _kaliméra_", "afternoon": "Καλησπέρα _kalispéra_", "evening": "Καλησπέρα _kalispéra_" },
+        "TH": { "morning": "สวัสดีตอนเช้า _sawatdee ton chao_", "afternoon": "สวัสดี _sawatdee_", "evening": "สวัสดีตอนเย็น _sawatdee ton yen_" },
+        "PL": { "morning": "Dzień dobry", "afternoon": "Dzień dobry", "evening": "Dobry wieczór" },
+        "DE": { "morning": "Guten Morgen", "afternoon": "Guten Tag", "evening": "Guten Abend" },
+        "AT": { "morning": "Guten Morgen", "afternoon": "Guten Tag", "evening": "Guten Abend" },
+        "CH": { "morning": "Guten Morgen", "afternoon": "Guten Tag", "evening": "Guten Abend" },
+        "FR": { "morning": "Bonjour", "afternoon": "Bonjour", "evening": "Bonsoir" },
+        "ES": { "morning": "Buenos días", "afternoon": "Buenas tardes", "evening": "Buenas noches" },
+        "MX": { "morning": "Buenos días", "afternoon": "Buenas tardes", "evening": "Buenas noches" },
+        "AR": { "morning": "Buenos días", "afternoon": "Buenas tardes", "evening": "Buenas noches" },
+        "IT": { "morning": "Buongiorno", "afternoon": "Buon pomeriggio", "evening": "Buonasera" },
+        "PT": { "morning": "Bom dia", "afternoon": "Boa tarde", "evening": "Boa noite" },
+        "BR": { "morning": "Bom dia", "afternoon": "Boa tarde", "evening": "Boa noite" },
+        "NL": { "morning": "Goedemorgen", "afternoon": "Goedemiddag", "evening": "Goedenavond" },
+        "FI": { "morning": "Hyvää huomenta", "afternoon": "Hyvää päivää", "evening": "Hyvää iltaa" },
+        "SE": { "morning": "God morgon", "afternoon": "God eftermiddag", "evening": "God kväll" },
+        "TR": { "morning": "Günaydın", "afternoon": "İyi günler", "evening": "İyi akşamlar" },
+        "ID": { "morning": "Selamat pagi", "afternoon": "Selamat siang", "evening": "Selamat malam" }
+      }
+    },
+    "query": { "type": "text", "default": "" },
+    "results": { "type": "list", "default": [] },
+    "shift": { "type": "number", "default": 0 }
+  },
+  "actions": {
+    "search": {
+      "steps": [
+        {
+          "if": "$args.value",
+          "then": [
+            { "fetch": "https://geocoding-api.open-meteo.com/v1/search?count=5&name={$args.value | url}", "select": "results", "as": "found" },
+            { "set": { "results": "$found" } }
+          ],
+          "else": [{ "set": { "results": [] } }]
+        }
+      ]
+    },
+    "add": {
+      "args": { "name": "text", "country": "text", "cc": "text", "tz": "text" },
+      "steps": [
+        { "remove": { "cities": { "match": { "tz": "$args.tz", "name": "$args.name" } } } },
+        { "push": { "cities": { "name": "$args.name", "country": "$args.country", "cc": "$args.cc", "tz": "$args.tz" } }, "at": "end" },
+        { "set": { "query": "", "results": [] } }
+      ]
+    },
+    "remove_city": { "args": { "name": "text", "tz": "text" }, "steps": [{ "remove": { "cities": { "match": { "name": "$args.name", "tz": "$args.tz" } } } }] },
+    "people": {
+      "args": { "name": "text", "tz": "text", "note": "text" },
+      "steps": [
+        {
+          "ask": { "title": "Who's in {$args.name}?", "message": "Names or @github handles, separated by commas", "input": "text", "default": "$args.note" },
+          "as": "who"
+        },
+        { "update": { "cities": { "match": { "name": "$args.name", "tz": "$args.tz" }, "set": { "note": "$who" } } } }
+      ]
+    },
+    "move_city": {
+      "args": { "name": "text", "tz": "text", "by": "int" },
+      "steps": [{ "move": { "cities": { "match": { "name": "$args.name", "tz": "$args.tz" }, "by": "$args.by" } } }]
+    },
+    "reset": { "steps": [{ "set": { "shift": 0 } }] }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "text": "It's {$now | time} here in {$now | zone:'local':'city'}", "size": "s", "emphasis": "subtle" },
+          { "field": "Add city", "type": "search", "bind": "$query", "placeholder": "Add city…", "on_change": "search" },
+          {
+            "column": [
+              {
+                "list": "$results",
+                "item": {
+                  "cell": "$item.name",
+                  "subtitle": "$item.country",
+                  "leading": "$item.country_code | flag",
+                  "trailing": "$now | add:$shift | time:$item.timezone",
+                  "on": "add",
+                  "args": { "name": "$item.name", "country": "$item.country", "cc": "$item.country_code", "tz": "$item.timezone" }
+                }
+              }
+            ],
+            "style": "inset",
+            "when": "$results"
+          },
+          {
+            "list": "$cities",
+            "item": {
+              "column": [
+                {
+                  "row": [
+                    { "text": "{$item.cc | flag} {$item.name}", "emphasis": "strong", "lines": 1, "grow": true },
+                    { "text": "$now | add:$shift | time:$item.tz", "size": "l", "emphasis": "strong", "mono": true },
+                    {
+                      "menu": "More for {$item.name}",
+                      "icon": "ellipsis",
+                      "icon_only": true,
+                      "items": [
+                        {
+                          "label": "Who's in {$item.name}…",
+                          "on": "people",
+                          "args": { "name": "$item.name", "tz": "$item.tz", "note": "$item.note | default:''" }
+                        },
+                        { "label": "Move Up", "on": "move_city", "args": { "name": "$item.name", "tz": "$item.tz", "by": -1 } },
+                        { "label": "Move Down", "on": "move_city", "args": { "name": "$item.name", "tz": "$item.tz", "by": 1 } },
+                        {
+                          "label": "Remove {$item.name}",
+                          "on": "remove_city",
+                          "args": { "name": "$item.name", "tz": "$item.tz" },
+                          "style": "destructive"
+                        }
+                      ]
+                    }
+                  ],
+                  "gap": "s",
+                  "align": "center"
+                },
+                {
+                  "row": [
+                    { "text": "$now | add:$shift | date:'day':$item.tz", "size": "s", "emphasis": "subtle", "grow": true },
+                    {
+                      "text": "{$now | add:$shift | zone:$item.tz} {$now | add:$shift | offset:$item.tz | map:{'0h':''}}",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "mono": true
+                    }
+                  ],
+                  "gap": "s"
+                },
+                { "text": "$item.note", "size": "s", "lines": 2, "when": "$item.note" },
+                {
+                  "text": "{$greetings | pick:$item.cc | pick:'morning' | default:'Good morning'}",
+                  "size": "s",
+                  "emphasis": "subtle",
+                  "markdown": true,
+                  "lines": 1,
+                  "when": "$now | add:$shift | hour:$item.tz | tone:{neutral:'<5', good:'<12', else:'neutral'} | map:{good:true, else:false}"
+                },
+                {
+                  "text": "{$greetings | pick:$item.cc | pick:'afternoon' | default:'Good afternoon'}",
+                  "size": "s",
+                  "emphasis": "subtle",
+                  "markdown": true,
+                  "lines": 1,
+                  "when": "$now | add:$shift | hour:$item.tz | tone:{neutral:'<12', good:'<18', else:'neutral'} | map:{good:true, else:false}"
+                },
+                {
+                  "text": "{$greetings | pick:$item.cc | pick:'evening' | default:'Good evening'}",
+                  "size": "s",
+                  "emphasis": "subtle",
+                  "markdown": true,
+                  "lines": 1,
+                  "when": "$now | add:$shift | hour:$item.tz | tone:{good:'<5 or >=18', else:'neutral'} | map:{good:true, else:false}"
+                },
+                {
+                  "gauge": "$now | add:$shift | hour:$item.tz",
+                  "min": 0,
+                  "max": 24,
+                  "style": "line",
+                  "band": [9, 18],
+                  "tone": "$now | add:$shift | hour:$item.tz | tone:{neutral:'<9 or >=18', else:'good'}"
+                }
+              ],
+              "gap": "xs"
+            },
+            "empty": "Search above to add a city"
+          },
+          {
+            "row": [
+              { "text": "{$shift | duration:'signed'} from now", "size": "s", "emphasis": "subtle", "when": "$shift" },
+              { "text": "Current time", "size": "s", "emphasis": "subtle", "when": "$shift | map:{0:true, else:false}" },
+              { "spacer": true },
+              { "button": "Now", "icon": "clock.arrow.circlepath", "style": "secondary", "size": "s", "on": "reset", "when": "$shift" }
+            ],
+            "align": "center"
+          },
+          { "field": "Shift", "type": "slider", "bind": "$shift", "min": -86400, "max": 86400, "step": 900, "format": "duration" },
+          { "row": [{ "text": "-24h", "size": "s", "emphasis": "subtle" }, { "spacer": true }, { "text": "+24h", "size": "s", "emphasis": "subtle" }] }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "globe",
+      "label": "{$cities.0.cc | flag} {$now | time:$cities.0.tz}",
+      "label_tone": "$now | hour:$cities.0.tz | tone:{neutral:'<9 or >=18', else:'good'}",
+      "card": "main"
+    },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

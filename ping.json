@@ -1,0 +1,102 @@
+{
+  "schema": "tailapps/v0",
+  "app": "ping",
+  "name": "Ping",
+  "description": "Send a short note to Ping on your other devices: your iPhone gets an alert even with TailApps closed, your Mac a notification. Pictures sent to it show too. Turn on ⋯ › Sync to My Devices on each one.",
+  "icon": "paperplane",
+  "version": 3,
+  "permissions": ["inbox:messages", "send:messages", "notify"],
+  "settings": {
+    "notify": { "type": "toggle", "label": "Notify me on this Mac when a note arrives", "default": true, "platforms": ["macos"] }
+  },
+  "state": {
+    "draft": { "type": "text", "default": "", "sync": false },
+    "log": { "type": "list", "default": [] }
+  },
+  "sources": {
+    "messages": { "inbox": "messages", "on_receive": "received" }
+  },
+  "actions": {
+    "ping": {
+      "steps": [
+        { "if": "$draft", "then": [
+          { "send": { "messages": { "text": "$draft", "at": "$now" } }, "alert": "$draft" },
+          { "push": { "log": { "text": "$draft", "who": "me", "device": "", "at": "$now" } }, "at": "end", "max": 50 },
+          { "set": { "draft": "" } }
+        ] }
+      ]
+    },
+    "received": {
+      "steps": [
+        { "if": "$args.event.clear", "then": [
+          { "set": { "log": [] } }
+        ], "else": [
+          { "if": "$args.file", "then": [
+            { "files.info": "$args.file", "as": "info" },
+            { "if": "$info.kind | map:{image:true, else:false}", "then": [
+              { "push": { "log": { "text": "$args.event.text", "image": "$args.file", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+              { "if": "$settings.notify", "then": [
+                { "notify": { "title": "Ping from {$args.from}", "body": "$args.event.text | default:'Sent a picture'" } }
+              ] }
+            ], "else": [
+              { "if": "$args.event.image | limit:8 | map:{'https://':true, else:false}", "then": [
+                { "push": { "log": { "text": "$args.event.text", "image": "$args.event.image", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+                { "if": "$settings.notify", "then": [
+                  { "notify": { "title": "Ping from {$args.from}", "body": "$args.event.text | default:'Sent a picture'" } }
+                ] }
+              ], "else": [
+                { "if": "$args.event.text", "then": [
+                  { "push": { "log": { "text": "$args.event.text", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+                  { "if": "$settings.notify", "then": [
+                    { "notify": { "title": "Ping from {$args.from}", "body": "$args.event.text" } }
+                  ] }
+                ] }
+              ] }
+            ] }
+          ], "else": [
+            { "if": "$args.event.image | limit:8 | map:{'https://':true, else:false}", "then": [
+              { "push": { "log": { "text": "$args.event.text", "image": "$args.event.image", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+              { "if": "$settings.notify", "then": [
+                { "notify": { "title": "Ping from {$args.from}", "body": "$args.event.text | default:'Sent a picture'" } }
+              ] }
+            ], "else": [
+              { "if": "$args.event.text", "then": [
+                { "push": { "log": { "text": "$args.event.text", "who": "them", "device": "$args.from", "at": "$args.event.at" } }, "at": "end", "max": 50 },
+                { "if": "$settings.notify", "then": [
+                  { "notify": { "title": "Ping from {$args.from}", "body": "$args.event.text" } }
+                ] }
+              ] }
+            ] }
+          ] }
+        ] }
+      ]
+    },
+    "clear": {
+      "confirm": "Clear these notes on all your devices?",
+      "steps": [
+        { "set": { "log": [] } },
+        { "send": { "messages": { "clear": true } } }
+      ]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "list": "$log", "scroll": "end", "height": "fill", "empty": "Nothing yet. Send a note, or ping this device from another one.",
+          "item": { "message": "$item.text", "from": "$item.who", "name": "$item.device", "media": "$item.image", "time": "$item.at | ago", "avatar": null } },
+        { "field": "Note", "bind": "$draft", "placeholder": "Type a note, then press Return", "on_submit": "ping" },
+        { "row": [
+          { "button": "Clear", "on": "clear", "style": "plain" },
+          { "spacer": true },
+          { "button": "Send", "on": "ping", "style": "primary", "disabled": "$running.ping" }
+        ], "align": "center" }
+      ],
+      "gap": "s"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "paperplane", "in_menu": "row", "label": "{$log | count} notes", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

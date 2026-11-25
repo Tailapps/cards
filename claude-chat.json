@@ -1,0 +1,56 @@
+{
+  "schema": "tailapps/v0",
+  "app": "claude-chat",
+  "name": "Claude Chat",
+  "description": "Chat with Claude using your own Anthropic API key; messages go to api.anthropic.com. Mac only until Connections (keys) come to the iPhone; the conversation stays on this device.",
+  "icon": "bubble.left.and.bubble.right",
+  "version": 1,
+  "permissions": ["net:api.anthropic.com", "open:url"],
+  "state": {
+    "history": { "type": "list", "default": [], "sync": false },
+    "draft": { "type": "text", "default": "", "sync": false }
+  },
+  "settings": {
+    "model": { "type": "text", "label": "Model", "default": "claude-sonnet-5-5" }
+  },
+  "actions": {
+    "send": {
+      "steps": [
+        { "if": "$draft", "then": [
+          { "push": { "history": { "role": "user", "content": "$draft" } }, "at": "end", "max": 100 },
+          { "set": { "draft": "" } },
+          { "fetch": "https://api.anthropic.com/v1/messages", "method": "POST", "auth": "anthropic",
+            "headers": { "anthropic-version": "2023-06-01" },
+            "body": { "model": "$settings.model", "max_tokens": 1024, "messages": "$history" },
+            "select": "content.0.text", "timeout": 120, "as": "reply" },
+          { "push": { "history": { "role": "assistant", "content": "$reply" } }, "at": "end", "max": 100 }
+        ] }
+      ]
+    },
+    "clear": {
+      "confirm": "Clear this conversation?",
+      "steps": [{ "set": { "history": [] } }]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "list": "$history", "scroll": "end", "height": "fill", "empty": "Ask Claude anything.",
+          "item": { "message": "$item.content", "from": "$item.role | map:{user:'me', else:'them'}", "name": "Claude", "avatar": null } },
+        { "badge": "Claude is thinking", "busy": true, "tone": "accent", "when": "$running.send" },
+        { "field": "Message", "bind": "$draft", "placeholder": "Ask something, then press Return", "on_submit": "send" },
+        { "row": [
+          { "button": "Clear", "on": "clear", "style": "plain", "disabled": "$running.send" },
+          { "spacer": true },
+          { "button": "Send", "on": "send", "style": "primary", "disabled": "$running.send" }
+        ], "align": "center" }
+      ],
+      "gap": "s"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "bubble.left.and.bubble.right", "in_menu": "row", "label": "{$history | count} messages", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

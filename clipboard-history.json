@@ -1,0 +1,103 @@
+{
+  "schema": "tailapps/v0",
+  "app": "clipboard-history",
+  "name": "Clipboard History",
+  "description": "Keeps the last 50 things you copy on your Mac, text and pictures, to copy again with a click. Passwords are skipped, and it never syncs. On the iPhone, tap Paste to keep what you copied.",
+  "icon": "list.clipboard",
+  "version": 1,
+  "sync": "never",
+  "permissions": ["clipboard.read", "clipboard.write"],
+  "settings": {
+    "paused": { "type": "toggle", "label": "Pause (don't keep new copies)", "default": false, "platforms": ["macos"] }
+  },
+  "sources": {
+    "clip": { "clipboard": ["text", "image"], "on_change": { "action": "keep", "watch": "$clip.change" }, "platforms": ["macos"] }
+  },
+  "state": {
+    "history": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "keep": {
+      "steps": [
+        { "if": "$settings.paused | map:{true:false, else:true}", "then": [
+          { "if": "$clip.kind | map:{text:true, image:true, else:false}", "then": [
+            { "if": "$clip.kind | map:{text:true, else:false}", "then": [
+              { "remove": { "history": { "match": { "text": "$clip.text" } } } }
+            ] },
+            { "push": { "history": { "id": "{$clip.at}-{$clip.change}", "kind": "$clip.kind", "text": "$clip.text", "image": "$clip.image", "from": "$clip.from", "at": "$clip.at" } }, "max": 50 }
+          ] }
+        ] }
+      ]
+    },
+    "paste": {
+      "steps": [
+        { "clipboard.read": ["text", "image"], "as": "pasted" },
+        { "if": "$pasted.kind | map:{text:true, image:true, else:false}", "then": [
+          { "if": "$pasted.kind | map:{text:true, else:false}", "then": [
+            { "remove": { "history": { "match": { "text": "$pasted.text" } } } }
+          ] },
+          { "push": { "history": { "id": "{$pasted.at}-{$pasted.change}", "kind": "$pasted.kind", "text": "$pasted.text", "image": "$pasted.image", "from": "$pasted.from", "at": "$pasted.at" } }, "max": 50 }
+        ] }
+      ]
+    },
+    "copy": {
+      "args": { "text": "text" },
+      "steps": [
+        { "clipboard.write": { "text": "$args.text" } }
+      ]
+    },
+    "copy_image": {
+      "args": { "id": "text", "path": "text" },
+      "steps": [
+        { "clipboard.write": { "image": "$args.path" } },
+        { "if": "$settings.paused | map:{true:false, else:true}", "then": [
+          { "remove": { "history": { "match": { "id": "$args.id" } } } }
+        ] }
+      ]
+    },
+    "forget": {
+      "args": { "id": "text" },
+      "steps": [
+        { "remove": { "history": { "match": { "id": "$args.id" } } } }
+      ]
+    },
+    "clear": {
+      "confirm": "Forget everything in your clipboard history?",
+      "steps": [
+        { "set": { "history": [] } }
+      ]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "row": [
+          { "text": "{$history | count} copies", "emphasis": "subtle", "size": "s", "grow": true },
+          { "badge": "Paused", "tone": "warn", "when": "$settings.paused" },
+          { "button": "Paste", "icon": "doc.on.clipboard", "on": "paste", "style": "primary", "platforms": ["ios"] },
+          { "button": "Clear", "on": "clear", "style": "plain", "when": "$history" }
+        ], "align": "center" },
+        { "text": "Copy something anywhere on your Mac and it shows up here.", "emphasis": "subtle", "when": "$history | count | map:{0:true, else:false}", "platforms": ["macos"] },
+        { "text": "Copy something, then tap Paste to keep it here.", "emphasis": "subtle", "when": "$history | count | map:{0:true, else:false}", "platforms": ["ios"] },
+        { "list": "$history", "limit": 20, "item": {
+          "row": [
+            { "column": [
+              { "text": "$item.text", "lines": 3, "size": "s", "when": "$item.kind | map:{text:true, else:false}" },
+              { "image": "$item.image", "height": "m", "alt": "Copied picture", "preview": true, "when": "$item.kind | map:{image:true, else:false}" },
+              { "text": "{$item.from | default:'Copied'} · {$item.at | ago}", "size": "xs", "emphasis": "subtle" }
+            ], "gap": "xs", "grow": true },
+            { "button": "Copy", "icon": "doc.on.doc", "icon_only": true, "style": "plain", "on": "copy", "args": { "text": "$item.text" }, "when": "$item.kind | map:{text:true, else:false}" },
+            { "button": "Copy picture", "icon": "doc.on.doc", "icon_only": true, "style": "plain", "on": "copy_image", "args": { "id": "$item.id", "path": "$item.image" }, "when": "$item.kind | map:{image:true, else:false}", "platforms": ["macos"] },
+            { "button": "Forget", "icon": "xmark", "icon_only": true, "style": "plain", "on": "forget", "args": { "id": "$item.id" } }
+          ], "align": "center"
+        } }
+      ],
+      "gap": "m"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "list.clipboard", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

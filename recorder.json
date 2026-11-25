@@ -1,0 +1,360 @@
+{
+  "schema": "tailapps/v0",
+  "app": "recorder",
+  "name": "Recorder",
+  "description": "Record your screen, a window or an area, with your microphone, what your Mac plays and a round camera bubble. Watch it, then share it or upload it to your own bucket and copy the link.",
+  "icon": "record.circle",
+  "permissions": [
+    "screen.record",
+    "mic.record",
+    "camera",
+    "displays.read",
+    "windows.read",
+    "share",
+    "files.write:dest",
+    "clipboard.write"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Upload recordings to",
+      "allow": [
+        "s3"
+      ]
+    }
+  },
+  "sources": {
+    "displays": {
+      "system": "displays",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "windows": {
+      "system": "windows",
+      "every": 5,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "state": {
+    "recording": {
+      "type": "bool",
+      "default": false
+    },
+    "mic": {
+      "type": "bool",
+      "default": true
+    },
+    "system_audio": {
+      "type": "bool",
+      "default": false
+    },
+    "clip": {
+      "type": "text",
+      "default": ""
+    },
+    "seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "clips": {
+      "type": "list",
+      "default": []
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "grid": [
+              {
+                "menu": "Display",
+                "icon": "display",
+                "layout": "stacked",
+                "items": "$displays",
+                "item": {
+                  "label": "$item.name",
+                  "on": "record",
+                  "args": {
+                    "target": "$item.id"
+                  }
+                }
+              },
+              {
+                "menu": "Window",
+                "icon": "macwindow",
+                "layout": "stacked",
+                "items": "$windows",
+                "item": {
+                  "label": "$item.app",
+                  "on": "record",
+                  "args": {
+                    "target": "$item.id"
+                  }
+                }
+              },
+              {
+                "button": "Area",
+                "icon": "rectangle.dashed",
+                "layout": "stacked",
+                "on": "record",
+                "args": {
+                  "target": "area"
+                }
+              },
+              {
+                "button": "Choose…",
+                "icon": "rectangle.on.rectangle",
+                "layout": "stacked",
+                "on": "record",
+                "args": {
+                  "target": "pick"
+                }
+              }
+            ],
+            "columns": {
+              "default": 2
+            },
+            "gap": "s",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$recording | map:{true:false, else:true}"
+          },
+          {
+            "column": [
+              {
+                "cell": "Microphone",
+                "leading": "mic",
+                "trailing": {
+                  "field": "Microphone",
+                  "type": "toggle",
+                  "bind": "$mic"
+                }
+              },
+              {
+                "cell": "What your Mac plays",
+                "leading": "speaker.wave.2",
+                "trailing": {
+                  "field": "What your Mac plays",
+                  "type": "toggle",
+                  "bind": "$system_audio"
+                }
+              }
+            ],
+            "style": "inset",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$recording | map:{true:false, else:true}"
+          },
+          {
+            "button": "Stop Recording",
+            "icon": "stop.circle",
+            "on": "stop",
+            "style": "destructive",
+            "size": "l",
+            "grow": true,
+            "platforms": [
+              "macos"
+            ],
+            "when": "$recording"
+          },
+          {
+            "button": "Camera Bubble",
+            "icon": "person.crop.circle",
+            "on": "camera",
+            "style": "secondary",
+            "grow": true,
+            "platforms": [
+              "macos"
+            ]
+          },
+          {
+            "player": "$clip",
+            "height": "l",
+            "when": "$clip"
+          },
+          {
+            "row": [
+              {
+                "text": "$seconds | duration:'clock'",
+                "size": "s",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Share…",
+                "icon": "square.and.arrow.up",
+                "on": "share_clip",
+                "style": "secondary"
+              },
+              {
+                "button": "Upload",
+                "icon": "icloud.and.arrow.up",
+                "on": "upload",
+                "disabled": "$running.upload"
+              }
+            ],
+            "align": "center",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$clip"
+          },
+          {
+            "list": "$clips",
+            "limit": 10,
+            "item": {
+              "cell": "$item.at | ago",
+              "subtitle": "$item.seconds | duration:'clock'",
+              "leading": "film",
+              "accessory": "none",
+              "trailing": {
+                "button": "Copy link",
+                "icon": "link",
+                "icon_only": true,
+                "on": "copy",
+                "args": {
+                  "url": "$item.url"
+                }
+              }
+            },
+            "when": "$clips"
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "bubble",
+      "layout": {
+        "player": "camera",
+        "shape": "circle",
+        "platforms": [
+          "macos"
+        ]
+      }
+    }
+  ],
+  "actions": {
+    "record": {
+      "args": {
+        "target": "text"
+      },
+      "steps": [
+        {
+          "screen.record.start": {
+            "target": "$args.target",
+            "sound": "$mic",
+            "system_audio": "$system_audio",
+            "max_seconds": 1800
+          }
+        },
+        {
+          "set": {
+            "recording": true,
+            "clip": ""
+          }
+        }
+      ]
+    },
+    "stop": {
+      "steps": [
+        {
+          "set": {
+            "recording": false
+          }
+        },
+        {
+          "screen.record.stop": {},
+          "as": "rec"
+        },
+        {
+          "set": {
+            "clip": "$rec.path",
+            "seconds": "$rec.seconds"
+          }
+        }
+      ]
+    },
+    "camera": {
+      "steps": [
+        {
+          "pop_out": "toggle"
+        }
+      ]
+    },
+    "share_clip": {
+      "steps": [
+        {
+          "share": {
+            "file": "$clip"
+          }
+        }
+      ]
+    },
+    "upload": {
+      "timeout": 1800,
+      "steps": [
+        {
+          "files.save": {
+            "data": "$clip",
+            "to": "$settings.dest",
+            "name": "recording-{$now}.mp4"
+          },
+          "as": "saved"
+        },
+        {
+          "push": {
+            "clips": {
+              "url": "$saved.url",
+              "seconds": "$seconds",
+              "at": "$now"
+            }
+          },
+          "max": 30
+        },
+        {
+          "clipboard.write": {
+            "text": "$saved.url"
+          }
+        },
+        {
+          "set": {
+            "clip": "",
+            "seconds": 0
+          }
+        }
+      ]
+    },
+    "copy": {
+      "args": {
+        "url": "text"
+      },
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$args.url"
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "record.circle",
+      "label": "{$clips | count} recordings",
+      "card": "main"
+    },
+    "floating": {
+      "card": "bubble",
+      "chrome": "none",
+      "pin": true
+    }
+  }
+}

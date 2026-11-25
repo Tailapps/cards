@@ -1,0 +1,98 @@
+{
+  "schema": "tailapps/v0",
+  "app": "dictate",
+  "name": "Dictate",
+  "description": "Hold a shortcut on the Mac (or tap Record on the iPhone), speak, let go: your words become text on your clipboard. Turn on Share and Sync to My Devices to see them on your other devices.",
+  "icon": "mic",
+  "version": 2,
+  "permissions": ["mic.record", "speech.transcribe", "clipboard.write", "inbox:heard", "send:heard"],
+  "settings": {
+    "share": { "type": "toggle", "label": "Share what I dictate with my other devices", "default": false }
+  },
+  "sources": {
+    "incoming": { "inbox": "heard", "on_receive": "received" }
+  },
+  "state": {
+    "listening": { "type": "bool", "default": false },
+    "last": { "type": "text", "default": "" },
+    "history": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "listen": {
+      "steps": [
+        { "mic.record.start": { "max_seconds": 120 } },
+        { "set": { "listening": true } }
+      ]
+    },
+    "transcribe": {
+      "steps": [
+        { "set": { "listening": false } },
+        { "mic.record.stop": {}, "as": "rec" },
+        { "speech.transcribe": "$rec.path", "as": "heard" },
+        { "set": { "last": "$heard.text" } },
+        { "if": "$heard.text", "then": [
+          { "clipboard.write": { "text": "$heard.text" } },
+          { "push": { "history": { "text": "$heard.text", "seconds": "$rec.seconds", "at": "$rec.at", "device": "" } }, "max": 20 },
+          { "if": "$settings.share", "then": [
+            { "send": { "heard": { "text": "$heard.text", "seconds": "$rec.seconds", "at": "$rec.at" } } }
+          ] }
+        ] }
+      ]
+    },
+    "received": {
+      "steps": [
+        { "if": "$args.event.text", "then": [
+          { "push": { "history": { "text": "$args.event.text", "seconds": "$args.event.seconds", "at": "$args.event.at", "device": "$args.from" } }, "max": 20 }
+        ] }
+      ]
+    },
+    "copy": {
+      "args": { "text": "text" },
+      "steps": [
+        { "clipboard.write": { "text": "$args.text" } }
+      ]
+    },
+    "clear": {
+      "confirm": "Clear what you've dictated?",
+      "steps": [
+        { "set": { "history": [], "last": "" } }
+      ]
+    }
+  },
+  "cards": [{
+    "id": "main",
+    "layout": {
+      "column": [
+        { "row": [
+          { "button": "Record", "on": "listen", "style": "primary", "when": "$listening | map:{true:false, else:true}", "disabled": "$running.transcribe" },
+          { "button": "Stop and transcribe", "on": "transcribe", "style": "primary", "when": "$listening" },
+          { "spacer": true },
+          { "button": "Clear", "on": "clear", "style": "plain", "when": "$history" }
+        ], "align": "center" },
+        { "badge": "Turning speech into text", "busy": true, "tone": "accent", "when": "$running.transcribe" },
+        { "text": "$last", "lines": 6, "when": "$last" },
+        { "text": "Hold ⌃⌥D anywhere, speak, then let go. The text lands on your clipboard.", "emphasis": "subtle", "when": "$last | count | map:{0:true, else:false}", "platforms": ["macos"] },
+        { "text": "Tap Record, speak, then tap Stop. The text lands on your clipboard.", "emphasis": "subtle", "when": "$last | count | map:{0:true, else:false}", "platforms": ["ios"] },
+        { "list": "$history", "limit": 5, "item": {
+          "row": [
+            { "column": [
+              { "text": "$item.text", "lines": 2, "size": "s" },
+              { "text": "from {$item.device}", "size": "xs", "emphasis": "subtle", "when": "$item.device" }
+            ], "gap": "xs", "grow": true },
+            { "button": "Copy", "on": "copy", "args": { "text": "$item.text" }, "style": "plain" }
+          ]
+        } }
+      ],
+      "gap": "m"
+    }
+  }],
+  "views": {
+    "menubar": { "icon": "mic", "card": "main", "label": "$listening | map:{true:'Listening', else:''}", "label_tone": "$listening | map:{true:'bad', else:'neutral'}" },
+    "floating": { "card": "main", "width": "narrow" }
+  },
+  "shortcuts": {
+    "actions": {
+      "listen": { "keys": "ctrl+opt+d", "scope": "global", "on_release": "transcribe" }
+    }
+  }
+}

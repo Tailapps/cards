@@ -1,0 +1,835 @@
+{
+  "schema": "tailapps/v0",
+  "app": "vm-board",
+  "name": "VM Board",
+  "description": "Your VMPal VMs with Start, Stop, Open and a Peek screenshot, from your Mac. For your iPhone, turn on Show on my iPhone and Sync to My Devices: it starts, stops and peeks at VMs via your Mac.",
+  "version": 1,
+  "icon": "server.rack",
+  "permissions": [
+    "script:list.sh",
+    "script:control.sh",
+    "script:peek.sh",
+    "open:url",
+    "inbox:shared",
+    "send:shared",
+    "inbox:ask",
+    "send:ask",
+    "inbox:done",
+    "send:done",
+    "inbox:peek",
+    "send:peek"
+  ],
+  "settings": {
+    "share": {
+      "type": "toggle",
+      "label": "Show on my iPhone",
+      "default": false,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "scripts": {
+    "list.sh": "#!/bin/sh\n# VMPal's VMs as JSON: {\"vms\":[{id,name,system,state,agent}], \"running\": N, \"choices\": [...]},\n# or with \"missing\" / \"error\". \"choices\" are the running VMs for Peek's picker.\n# Uses the vmpal command, or VMPal's own copy of it when the command isn't installed. Changes nothing.\napp=/Applications/VMPal.app/Contents/Helpers/VMPalMachine.app/Contents/MacOS/VMPalMachine\nif command -v vmpal >/dev/null 2>&1; then set -- vmpal\nelif [ -x \"$app\" ]; then set -- \"$app\" --cli\nelse echo '{\"missing\":true,\"vms\":[],\"running\":0,\"choices\":[]}'; exit 0; fi\nerr=\"${TMPDIR:-/tmp}/vm-board-list.err\"\nif ! out=$(\"$@\" list --json 2>\"$err\"); then\n  jq -nc --rawfile e \"$err\" '{vms: [], running: 0, choices: [], error: ($e | split(\"\\n\")[0] | sub(\"^vmpal: \"; \"\"))}'\n  exit 0\nfi\nprintf '%s' \"$out\" | jq -c '{\n  vms: [.vms[] | {id, name, system, state, agent: .agentControl}],\n  running: ([.vms[] | select(.state == \"running\")] | length),\n  choices: ([{label: \"First running VM\", value: \"\"}] + [.vms[] | select(.state == \"running\") | {label: .name, value: .id}])\n}'\n",
+    "control.sh": "#!/bin/sh\n# Start, stop or show (bring forward) the VMPal VM with ID $2 ($3 is its name, for the message).\n# Always prints {\"ok\":…,\"message\":…} and exits 0, so the card (and the iPhone) can say what happened.\n# Stop shuts the VM down as its own Shut Down does.\napp=/Applications/VMPal.app/Contents/Helpers/VMPalMachine.app/Contents/MacOS/VMPalMachine\ncmd=$1\nid=$2\nname=${3:-$2}\nfail() { jq -nc --arg m \"$1\" '{ok: false, message: $m}'; exit 0; }\ncase \"$cmd\" in\n  start) past=\"Started\" ;;\n  stop) past=\"Shut down\" ;;\n  show) past=\"Opened\" ;;\n  *) fail \"Unknown command: $cmd\" ;;\nesac\ncase \"$id\" in\n  \"\"|-*) fail \"Pick a VM\" ;;\nesac\nif command -v vmpal >/dev/null 2>&1; then set -- vmpal\nelif [ -x \"$app\" ]; then set -- \"$app\" --cli\nelse fail \"VMPal is not installed on this Mac\"; fi\nerr=\"${TMPDIR:-/tmp}/vm-board-control.err\"\nif \"$@\" \"$cmd\" \"$id\" >/dev/null 2>\"$err\"; then\n  jq -nc --arg m \"$past $name\" '{ok: true, message: $m}'\nelse\n  fail \"$(head -n 1 \"$err\" | sed 's/^vmpal: //')\"\nfi\n",
+    "peek.sh": "#!/bin/sh\n# A screenshot of the VMPal VM with ID $1 (the first running VM when empty), for the Peek tab.\n# $2 is \"true\" to take one now; anything else prints {\"paused\":true} (Live is off).\n# Prints {\"vm\",\"path\",\"at\"} or {\"vm\",\"error\"}. Needs the VM's agent control (on by default).\n# If the guest's display is asleep, VMPal wakes it with a press of Shift.\nid=$1\n[ \"$2\" = \"true\" ] || { echo '{\"paused\":true}'; exit 0; }\napp=/Applications/VMPal.app/Contents/Helpers/VMPalMachine.app/Contents/MacOS/VMPalMachine\nfail() { jq -nc --arg vm \"$1\" --arg e \"$2\" '{vm: $vm, error: $e}'; exit 0; }\nif command -v vmpal >/dev/null 2>&1; then set -- vmpal\nelif [ -x \"$app\" ]; then set -- \"$app\" --cli\nelse fail \"\" \"VMPal is not installed on this Mac\"; fi\ncase \"$id\" in -*) fail \"\" \"Pick a VM\" ;; esac\n# The VM's name for the caption; with no ID, the first running VM.\nvm=$(\"$@\" list --json 2>/dev/null | jq -r --arg id \"$id\" \\\n  '[.vms[] | select(if $id == \"\" then .state == \"running\" else .id == $id end)][0] | select(.) | \"\\(.id)\\t\\(.name)\"')\n[ -n \"$vm\" ] || { [ -z \"$id\" ] && fail \"\" \"No VM is running\"; fail \"\" \"That VM isn't in VMPal any more\"; }\nid=${vm%%\"\t\"*}\nname=${vm#*\"\t\"}\n# The card's own tmp folder (the parent of this run's $TMPDIR): the card can show the picture and send it to\n# your iPhone from there, and TailApps empties it after a day. A Trusted run has no $TMPDIR: caches instead\n# (the Mac shows it, but it can't go to the iPhone).\nif [ -n \"$TMPDIR\" ]; then dir=$(dirname \"$TMPDIR\"); else dir=\"$HOME/Library/Caches/TailApps VM Board\"; mkdir -p \"$dir\"; fi\n# A new file each time, so a picture never changes under its caption; older ones go after 10 minutes.\nfind \"$dir\" -maxdepth 1 -name 'peek-*.jpg' -mmin +10 -delete 2>/dev/null\nfile=\"$dir/peek-$(date +%s)-$$.jpg\"\nerr=\"${TMPDIR:-/tmp}/vm-board-peek.err\"\nif \"$@\" ui \"$id\" screenshot -o \"$file\" --max-width 960 >/dev/null 2>\"$err\"; then\n  jq -nc --arg vm \"$name\" --arg p \"$file\" --argjson at \"$(date +%s)\" '{vm: $vm, path: $p, at: $at}'\nelse\n  fail \"$name\" \"$(head -n 1 \"$err\" | sed 's/^vmpal: //')\"\nfi\n"
+  },
+  "state": {
+    "vms": {
+      "type": "object",
+      "default": {
+        "vms": [],
+        "running": 0,
+        "choices": []
+      }
+    },
+    "last": {
+      "type": "object",
+      "default": {}
+    },
+    "peek_vm": {
+      "type": "text",
+      "default": ""
+    },
+    "peek_live": {
+      "type": "bool",
+      "default": false
+    },
+    "peek": {
+      "type": "object",
+      "default": {}
+    },
+    "mac": {
+      "type": "text",
+      "default": ""
+    },
+    "target": {
+      "type": "any",
+      "default": ""
+    },
+    "target_do": {
+      "type": "text",
+      "default": ""
+    },
+    "phone_peek": {
+      "type": "object",
+      "default": {}
+    }
+  },
+  "sources": {
+    "vms": {
+      "script": "list.sh",
+      "every": 10,
+      "on": "open",
+      "platforms": [
+        "macos"
+      ],
+      "on_change": "report"
+    },
+    "shot": {
+      "script": "peek.sh",
+      "args": [
+        "$peek_vm",
+        "$peek_live"
+      ],
+      "every": 30,
+      "timeout": 60,
+      "platforms": [
+        "macos"
+      ],
+      "on_change": {
+        "action": "keep_shot",
+        "watch": "{$shot.at}{$shot.error}"
+      }
+    },
+    "shared": {
+      "inbox": "shared",
+      "on_receive": "heard",
+      "platforms": [
+        "ios"
+      ]
+    },
+    "asks": {
+      "inbox": "ask",
+      "on_receive": "asked",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "results": {
+      "inbox": "done",
+      "on_receive": "finished",
+      "platforms": [
+        "ios"
+      ]
+    },
+    "peeks": {
+      "inbox": "peek",
+      "on_receive": "got_peek",
+      "platforms": [
+        "ios"
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "tabs": [
+              {
+                "label": "VMs",
+                "icon": "server.rack",
+                "count": "$vms.running",
+                "children": [
+                  {
+                    "column": [
+                      {
+                        "text": "VMPal isn't on this Mac. Install it, and this card finds it.",
+                        "emphasis": "subtle"
+                      },
+                      {
+                        "button": "Get VMPal",
+                        "icon": "arrow.down.circle",
+                        "on": "get_vmpal",
+                        "style": "secondary"
+                      }
+                    ],
+                    "gap": "s",
+                    "when": "$vms.missing"
+                  },
+                  {
+                    "text": "$vms.error",
+                    "tone": "bad",
+                    "size": "s",
+                    "when": "$vms.error"
+                  },
+                  {
+                    "list": "$vms.vms",
+                    "empty": "No VMs in VMPal yet",
+                    "item": {
+                      "cell": "$item.name",
+                      "subtitle": "{$item.state | map:{running:'Running', stopped:'Off', suspended:'Suspended', paused:'Paused'}} · {$item.system}",
+                      "status": "$item.state | tone:{running:'good', paused:'warn', suspended:'neutral', stopped:'neutral', else:'accent'}",
+                      "trailing": {
+                        "row": [
+                          {
+                            "button": "Start",
+                            "icon": "play.fill",
+                            "icon_only": true,
+                            "size": "s",
+                            "on": "control",
+                            "args": {
+                              "do": "start",
+                              "id": "$item.id",
+                              "name": "$item.name"
+                            },
+                            "disabled": "$running.control",
+                            "when": "$item.state | map:{running:false, else:true}"
+                          },
+                          {
+                            "button": "Open",
+                            "icon": "macwindow",
+                            "icon_only": true,
+                            "size": "s",
+                            "on": "control",
+                            "args": {
+                              "do": "show",
+                              "id": "$item.id",
+                              "name": "$item.name"
+                            },
+                            "disabled": "$running.control",
+                            "when": "$item.state | map:{running:true, else:false}"
+                          },
+                          {
+                            "button": "Shut down",
+                            "icon": "stop.fill",
+                            "icon_only": true,
+                            "size": "s",
+                            "on": "control",
+                            "args": {
+                              "do": "stop",
+                              "id": "$item.id",
+                              "name": "$item.name"
+                            },
+                            "disabled": "$running.control",
+                            "confirm": "Shut down {$item.name}?",
+                            "when": "$item.state | map:{running:true, else:false}"
+                          }
+                        ],
+                        "gap": "xs"
+                      }
+                    }
+                  },
+                  {
+                    "badge": "Working…",
+                    "tone": "accent",
+                    "busy": true,
+                    "when": "$running.control"
+                  },
+                  {
+                    "text": "$last.message",
+                    "size": "s",
+                    "tone": "$last.ok | map:{true:'neutral', else:'bad'}",
+                    "when": "$last.message"
+                  },
+                  {
+                    "text": "{$vms.running} running · updated {$meta.vms.updated | ago}",
+                    "size": "xs",
+                    "emphasis": "subtle",
+                    "when": "$meta.vms.updated"
+                  }
+                ]
+              },
+              {
+                "label": "Peek",
+                "icon": "eye",
+                "children": [
+                  {
+                    "row": [
+                      {
+                        "field": "VM",
+                        "type": "select",
+                        "value": "$peek_vm",
+                        "options": "$vms.choices",
+                        "on_change": "pick_peek",
+                        "grow": true
+                      },
+                      {
+                        "button": "Take a look",
+                        "icon": "camera",
+                        "icon_only": true,
+                        "on": "peek_now",
+                        "disabled": "$running.peek_now"
+                      }
+                    ],
+                    "align": "center",
+                    "gap": "s"
+                  },
+                  {
+                    "field": "Live",
+                    "type": "toggle",
+                    "bind": "$peek_live"
+                  },
+                  {
+                    "image": "$peek.path",
+                    "height": "xl",
+                    "fit": "fit",
+                    "preview": true,
+                    "alt": "Screen of {$peek.vm}",
+                    "when": "$peek.path"
+                  },
+                  {
+                    "text": "$peek.error",
+                    "tone": "bad",
+                    "size": "s",
+                    "when": "$peek.error"
+                  },
+                  {
+                    "text": "{$peek.vm} · {$peek.at | ago}",
+                    "size": "xs",
+                    "emphasis": "subtle",
+                    "when": "$peek.at"
+                  },
+                  {
+                    "text": "Live takes a look every 30 seconds. Peek needs the VM's agent control (VMPal › Settings › AI Agents), and wakes a sleeping screen with Shift.",
+                    "size": "xs",
+                    "emphasis": "subtle"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "gap": "s"
+      }
+    },
+    {
+      "id": "phone",
+      "layout": {
+        "column": [
+          {
+            "list": "$vms.vms",
+            "empty": "Nothing from your Mac yet. In VM Board on your Mac, turn on Show on my iPhone, and Sync to My Devices on both.",
+            "item": {
+              "cell": "$item.name",
+              "subtitle": "{$item.state | map:{running:'Running', stopped:'Off', suspended:'Suspended', paused:'Paused'}} · {$item.system}",
+              "status": "$item.state | tone:{running:'good', paused:'warn', suspended:'neutral', stopped:'neutral', else:'accent'}",
+              "trailing": {
+                "row": [
+                  {
+                    "button": "Start",
+                    "icon": "play.fill",
+                    "size": "s",
+                    "on": "ask",
+                    "args": {
+                      "do": "start",
+                      "id": "$item.id",
+                      "name": "$item.name"
+                    },
+                    "when": "$item.state | map:{running:false, else:true}"
+                  },
+                  {
+                    "button": "Peek",
+                    "icon": "eye",
+                    "icon_only": true,
+                    "size": "s",
+                    "on": "ask_peek",
+                    "args": {
+                      "id": "$item.id",
+                      "name": "$item.name"
+                    },
+                    "when": "$item.state | map:{running:true, else:false}"
+                  },
+                  {
+                    "button": "Shut down",
+                    "icon": "stop.fill",
+                    "size": "s",
+                    "on": "ask",
+                    "style": "destructive",
+                    "args": {
+                      "do": "stop",
+                      "id": "$item.id",
+                      "name": "$item.name"
+                    },
+                    "confirm": "Shut down {$item.name}?",
+                    "when": "$item.state | map:{running:true, else:false}"
+                  }
+                ],
+                "gap": "xs"
+              }
+            }
+          },
+          {
+            "image": "$phone_peek.path",
+            "height": "xl",
+            "fit": "fit",
+            "preview": true,
+            "alt": "Screen of {$phone_peek.vm}",
+            "when": "$phone_peek.path"
+          },
+          {
+            "text": "{$phone_peek.vm} · {$phone_peek.at | ago}",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$phone_peek.path"
+          },
+          {
+            "text": "$last.message",
+            "size": "s",
+            "tone": "$last.ok | map:{true:'neutral', else:'bad'}",
+            "when": "$last.message"
+          },
+          {
+            "row": [
+              {
+                "text": "Runs on your Mac: keep it awake with TailApps open.",
+                "size": "xs",
+                "emphasis": "subtle",
+                "grow": true
+              },
+              {
+                "button": "Ask my Mac",
+                "icon": "arrow.clockwise",
+                "icon_only": true,
+                "size": "s",
+                "on": "ask_list"
+              }
+            ],
+            "align": "center",
+            "gap": "s"
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "actions": {
+    "control": {
+      "args": {
+        "do": "enum:start|stop|show",
+        "id": "text",
+        "name": "text"
+      },
+      "timeout": 340,
+      "steps": [
+        {
+          "script": "control.sh",
+          "args": [
+            "$args.do",
+            "$args.id",
+            "$args.name"
+          ],
+          "timeout": 330,
+          "as": "r"
+        },
+        {
+          "set": {
+            "last": "$r"
+          }
+        },
+        {
+          "refresh": "vms"
+        }
+      ]
+    },
+    "get_vmpal": {
+      "steps": [
+        {
+          "open": "https://vmpal.com"
+        }
+      ]
+    },
+    "report": {
+      "steps": [
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "send": {
+                "shared": "$vms"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "heard": {
+      "steps": [
+        {
+          "if": "$args.event.running | map:{null:false, else:true}",
+          "then": [
+            {
+              "set": {
+                "vms": "$args.event",
+                "mac": "$args.from_id"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "ask": {
+      "args": {
+        "do": "enum:start|stop",
+        "id": "text",
+        "name": "text"
+      },
+      "steps": [
+        {
+          "send": {
+            "ask": {
+              "do": "$args.do",
+              "id": "$args.id",
+              "name": "$args.name",
+              "at": "$now"
+            }
+          },
+          "to": "$mac"
+        },
+        {
+          "set": {
+            "last": {
+              "ok": true,
+              "message": "Asked your Mac…"
+            }
+          }
+        }
+      ]
+    },
+    "ask_peek": {
+      "args": {
+        "id": "text",
+        "name": "text"
+      },
+      "steps": [
+        {
+          "send": {
+            "ask": {
+              "do": "peek",
+              "id": "$args.id",
+              "name": "$args.name",
+              "at": "$now"
+            }
+          },
+          "to": "$mac"
+        },
+        {
+          "set": {
+            "last": {
+              "ok": true,
+              "message": "Asked your Mac for a look at {$args.name}…"
+            }
+          }
+        }
+      ]
+    },
+    "got_peek": {
+      "steps": [
+        {
+          "if": "$args.file",
+          "then": [
+            {
+              "set": {
+                "phone_peek": {
+                  "vm": "$args.event.vm",
+                  "at": "$args.event.at",
+                  "path": "$args.file"
+                },
+                "last": {}
+              }
+            }
+          ],
+          "else": [
+            {
+              "set": {
+                "last": {
+                  "ok": false,
+                  "message": "The picture didn't come through from your Mac. Try again."
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "ask_list": {
+      "steps": [
+        {
+          "send": {
+            "ask": {
+              "do": "list",
+              "at": "$now"
+            }
+          }
+        },
+        {
+          "set": {
+            "last": {
+              "ok": true,
+              "message": "Asked your Mac…"
+            }
+          }
+        }
+      ]
+    },
+    "asked": {
+      "timeout": 340,
+      "steps": [
+        {
+          "if": "$settings.share",
+          "then": [
+            {
+              "if": "$args.event.at | times:-1 | add:$now | tone:{good:'<=120', else:'bad'} | map:{good:true, else:false}",
+              "then": [
+                {
+                  "if": "$args.event.do | map:{start:true, stop:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "target": "$vms.vms | where:'id':$args.event.id | pick:0 | default:''",
+                        "target_do": "$args.event.do | map:{start:'start', stop:'stop', else:''}"
+                      }
+                    },
+                    {
+                      "if": "$target.id",
+                      "then": [
+                        {
+                          "script": "control.sh",
+                          "args": [
+                            "$target_do",
+                            "$target.id",
+                            "$target.name"
+                          ],
+                          "timeout": 330,
+                          "as": "r"
+                        },
+                        {
+                          "set": {
+                            "last": "$r"
+                          }
+                        },
+                        {
+                          "refresh": "vms"
+                        },
+                        {
+                          "send": {
+                            "done": "$r"
+                          },
+                          "to": "$args.from_id",
+                          "alert": "$r.message"
+                        }
+                      ],
+                      "else": [
+                        {
+                          "send": {
+                            "done": {
+                              "ok": false,
+                              "message": "Your Mac has no such VM any more"
+                            }
+                          },
+                          "to": "$args.from_id"
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "if": "$args.event.do | map:{peek:true, else:false}",
+                      "then": [
+                        {
+                          "set": {
+                            "target": "$vms.vms | where:'id':$args.event.id | pick:0 | default:''"
+                          }
+                        },
+                        {
+                          "if": "$target.id",
+                          "then": [
+                            {
+                              "script": "peek.sh",
+                              "args": [
+                                "$target.id",
+                                "true"
+                              ],
+                              "timeout": 55,
+                              "as": "s"
+                            },
+                            {
+                              "if": "$s.path",
+                              "then": [
+                                {
+                                  "send": {
+                                    "peek": {
+                                      "vm": "$s.vm",
+                                      "at": "$s.at"
+                                    }
+                                  },
+                                  "file": "$s.path",
+                                  "to": "$args.from_id"
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "send": {
+                                    "done": {
+                                      "ok": false,
+                                      "message": "$s.error | default:'No picture'"
+                                    }
+                                  },
+                                  "to": "$args.from_id"
+                                }
+                              ]
+                            }
+                          ],
+                          "else": [
+                            {
+                              "send": {
+                                "done": {
+                                  "ok": false,
+                                  "message": "Your Mac has no such VM any more"
+                                }
+                              },
+                              "to": "$args.from_id"
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "send": {
+                            "shared": "$vms"
+                          },
+                          "to": "$args.from_id"
+                        },
+                        {
+                          "send": {
+                            "done": {
+                              "ok": true,
+                              "message": "Up to date"
+                            }
+                          },
+                          "to": "$args.from_id"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "send": {
+                    "done": {
+                      "ok": false,
+                      "message": "Your Mac got that too late, so it did nothing. Try again."
+                    }
+                  },
+                  "to": "$args.from_id"
+                }
+              ]
+            }
+          ],
+          "else": [
+            {
+              "send": {
+                "done": {
+                  "ok": false,
+                  "message": "Turn on Show on my iPhone in VM Board on your Mac"
+                }
+              },
+              "to": "$args.from_id"
+            }
+          ]
+        }
+      ]
+    },
+    "finished": {
+      "steps": [
+        {
+          "if": "$args.event.message",
+          "then": [
+            {
+              "set": {
+                "last": "$args.event"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "keep_shot": {
+      "steps": [
+        {
+          "if": "$shot.paused",
+          "else": [
+            {
+              "set": {
+                "peek": "$shot"
+              }
+            }
+          ],
+          "then": []
+        }
+      ]
+    },
+    "peek_now": {
+      "timeout": 60,
+      "steps": [
+        {
+          "script": "peek.sh",
+          "args": [
+            "$peek_vm",
+            "true"
+          ],
+          "timeout": 50,
+          "as": "s"
+        },
+        {
+          "set": {
+            "peek": "$s"
+          }
+        }
+      ]
+    },
+    "pick_peek": {
+      "steps": [
+        {
+          "set": {
+            "peek_vm": "$args.value"
+          }
+        },
+        {
+          "script": "peek.sh",
+          "args": [
+            "$args.value",
+            "true"
+          ],
+          "timeout": 50,
+          "as": "s"
+        },
+        {
+          "set": {
+            "peek": "$s"
+          }
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "server.rack",
+      "label": "{$vms.running} running",
+      "label_tone": "$vms.running | tone:{good:'>0', else:'neutral'}",
+      "label_icon": "$vms.missing | map:{true:'exclamationmark.triangle', else:'server.rack'}",
+      "card": "main",
+      "in_menu": "card"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    },
+    "phone": {
+      "card": "phone"
+    }
+  }
+}

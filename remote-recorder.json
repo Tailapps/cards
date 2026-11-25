@@ -1,0 +1,559 @@
+{
+  "schema": "tailapps/v0",
+  "app": "remote-recorder",
+  "name": "Remote Recorder",
+  "description": "Start and stop a screen recording on your Mac from your iPhone, see how long it's been going, then watch it on the phone. The Mac stays awake while it records. Turn on Sync to My Devices on both.",
+  "icon": "record.circle",
+  "version": 1,
+  "permissions": [
+    "screen.record",
+    "screen.record.remote",
+    "power.control",
+    "inbox:asks",
+    "send:asks",
+    "inbox:clips",
+    "send:clips",
+    "files.write:dest",
+    "share",
+    "open:url"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Upload recordings too big to send (over 10 MB) to",
+      "allow": [
+        "s3"
+      ],
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "state": {
+    "phase": {
+      "type": "text",
+      "default": "idle",
+      "sync": true
+    },
+    "started_at": {
+      "type": "number",
+      "default": 0,
+      "sync": true
+    },
+    "clip": {
+      "type": "text",
+      "default": ""
+    },
+    "seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "link": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "sources": {
+    "asks": {
+      "inbox": "asks",
+      "on_receive": "asked",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "clips": {
+      "inbox": "clips",
+      "on_receive": "got",
+      "platforms": [
+        "ios"
+      ]
+    }
+  },
+  "actions": {
+    "start": {
+      "steps": [
+        {
+          "screen.record.start": {
+            "target": "display",
+            "max_seconds": 900
+          }
+        },
+        {
+          "awake.start": {
+            "display": true,
+            "minutes": 15
+          }
+        },
+        {
+          "set": {
+            "phase": "recording",
+            "started_at": "$now",
+            "clip": "",
+            "link": ""
+          }
+        }
+      ]
+    },
+    "finish": {
+      "timeout": 900,
+      "steps": [
+        {
+          "set": {
+            "phase": "sending"
+          }
+        },
+        {
+          "awake.stop": {}
+        },
+        {
+          "screen.record.stop": {},
+          "as": "rec"
+        },
+        {
+          "set": {
+            "clip": "$rec.path",
+            "seconds": "$rec.seconds",
+            "link": ""
+          }
+        },
+        {
+          "if": "$rec.size | tone:{good:'<=10000000', else:'bad'} | map:{good:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "phase": "ready"
+              }
+            },
+            {
+              "send": {
+                "clips": {
+                  "seconds": "$rec.seconds",
+                  "at": "$now"
+                }
+              },
+              "file": "$rec.path",
+              "alert": "Your Mac's screen recording is ready"
+            }
+          ],
+          "else": [
+            {
+              "if": "$settings.dest",
+              "then": [
+                {
+                  "files.save": {
+                    "data": "$rec.path",
+                    "to": "$settings.dest",
+                    "name": "recording-{$now}.mp4"
+                  },
+                  "as": "saved"
+                },
+                {
+                  "set": {
+                    "link": "$saved.url"
+                  }
+                },
+                {
+                  "set": {
+                    "phase": "ready"
+                  }
+                },
+                {
+                  "send": {
+                    "clips": {
+                      "seconds": "$rec.seconds",
+                      "at": "$now",
+                      "link": "$saved.url"
+                    }
+                  },
+                  "alert": "Your Mac's screen recording is uploaded"
+                }
+              ],
+              "else": [
+                {
+                  "set": {
+                    "phase": "too_big"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "asked": {
+      "timeout": 900,
+      "steps": [
+        {
+          "if": "$args.event.do | map:{start:true, else:false}",
+          "then": [
+            {
+              "if": "$args.event.at | times:-1 | add:$now | tone:{good:'<=120', else:'bad'} | map:{good:true, else:false}",
+              "then": [
+                {
+                  "screen.record.start": {
+                    "target": "display",
+                    "max_seconds": 900
+                  }
+                },
+                {
+                  "awake.start": {
+                    "display": true,
+                    "minutes": 15
+                  }
+                },
+                {
+                  "set": {
+                    "phase": "recording",
+                    "started_at": "$now",
+                    "clip": "",
+                    "link": ""
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "if": "$args.event.do | map:{stop:true, else:false}",
+          "then": [
+            {
+              "set": {
+                "phase": "sending"
+              }
+            },
+            {
+              "awake.stop": {}
+            },
+            {
+              "screen.record.stop": {},
+              "as": "rec"
+            },
+            {
+              "set": {
+                "clip": "$rec.path",
+                "seconds": "$rec.seconds",
+                "link": ""
+              }
+            },
+            {
+              "if": "$rec.size | tone:{good:'<=10000000', else:'bad'} | map:{good:true, else:false}",
+              "then": [
+                {
+                  "send": {
+                    "clips": {
+                      "seconds": "$rec.seconds",
+                      "at": "$now"
+                    }
+                  },
+                  "file": "$rec.path",
+                  "to": "$args.from_id",
+                  "alert": "Your Mac's screen recording is ready"
+                },
+                {
+                  "set": {
+                    "phase": "ready"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "if": "$settings.dest",
+                  "then": [
+                    {
+                      "files.save": {
+                        "data": "$rec.path",
+                        "to": "$settings.dest",
+                        "name": "recording-{$now}.mp4"
+                      },
+                      "as": "saved"
+                    },
+                    {
+                      "set": {
+                        "link": "$saved.url"
+                      }
+                    },
+                    {
+                      "send": {
+                        "clips": {
+                          "seconds": "$rec.seconds",
+                          "at": "$now",
+                          "link": "$saved.url"
+                        }
+                      },
+                      "to": "$args.from_id",
+                      "alert": "Your Mac's screen recording is uploaded"
+                    },
+                    {
+                      "set": {
+                        "phase": "ready"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "set": {
+                        "phase": "too_big"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "ask_start": {
+      "confirm": "Start recording your Mac's screen?",
+      "steps": [
+        {
+          "set": {
+            "phase": "starting",
+            "clip": "",
+            "link": ""
+          }
+        },
+        {
+          "send": {
+            "asks": {
+              "do": "start",
+              "at": "$now"
+            }
+          }
+        }
+      ]
+    },
+    "ask_stop": {
+      "steps": [
+        {
+          "set": {
+            "phase": "sending"
+          }
+        },
+        {
+          "send": {
+            "asks": {
+              "do": "stop",
+              "at": "$now"
+            }
+          }
+        }
+      ]
+    },
+    "got": {
+      "steps": [
+        {
+          "set": {
+            "clip": "$args.file | default:''",
+            "seconds": "$args.event.seconds",
+            "link": "$args.event.link | default:''"
+          }
+        }
+      ]
+    },
+    "forget": {
+      "steps": [
+        {
+          "set": {
+            "phase": "idle"
+          }
+        }
+      ]
+    },
+    "share_clip": {
+      "steps": [
+        {
+          "share": {
+            "file": "$clip"
+          }
+        }
+      ]
+    },
+    "open_link": {
+      "steps": [
+        {
+          "open": "$link"
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "icon": "$phase | map:{recording:'record.circle.fill', starting:'hourglass', sending:'arrow.up.circle', ready:'checkmark.circle.fill', too_big:'exclamationmark.triangle', else:'record.circle'}",
+                "tone": "$phase | tone:{recording:'bad', ready:'good', too_big:'warn', starting:'accent', sending:'accent', else:'neutral'}",
+                "size": "l"
+              },
+              {
+                "column": [
+                  {
+                    "text": "$phase | map:{idle:'Not recording', starting:'Asking your Mac to start…', recording:'Recording your Mac', sending:'Getting the recording…', ready:'Recording ready', too_big:'Too big to send: it is on your Mac', else:'Not recording'}",
+                    "emphasis": "strong"
+                  },
+                  {
+                    "timer": "$started_at",
+                    "mode": "since",
+                    "size": "s",
+                    "when": "$phase | map:{recording:true, else:false}"
+                  },
+                  {
+                    "row": [
+                      {
+                        "text": "Stops by itself in",
+                        "size": "xs",
+                        "emphasis": "subtle"
+                      },
+                      {
+                        "timer": "$started_at | add:900",
+                        "mode": "until",
+                        "size": "xs",
+                        "on_end": "finish"
+                      }
+                    ],
+                    "gap": "xs",
+                    "platforms": [
+                      "macos"
+                    ],
+                    "when": "$phase | map:{recording:true, else:false}"
+                  },
+                  {
+                    "text": "$seconds | duration:'clock'",
+                    "size": "s",
+                    "emphasis": "subtle",
+                    "when": "$phase | map:{ready:true, too_big:true, else:false}"
+                  }
+                ],
+                "gap": "xs",
+                "grow": true
+              }
+            ],
+            "align": "center",
+            "gap": "m"
+          },
+          {
+            "player": "$clip",
+            "height": "l",
+            "when": "$clip"
+          },
+          {
+            "row": [
+              {
+                "button": "Share…",
+                "icon": "square.and.arrow.up",
+                "on": "share_clip",
+                "style": "secondary",
+                "when": "$clip"
+              },
+              {
+                "button": "Open link",
+                "icon": "link",
+                "on": "open_link",
+                "style": "secondary",
+                "when": "$link"
+              }
+            ],
+            "gap": "s"
+          },
+          {
+            "button": "Record This Mac",
+            "icon": "record.circle",
+            "on": "start",
+            "style": "primary",
+            "size": "l",
+            "grow": true,
+            "platforms": [
+              "macos"
+            ],
+            "when": "$phase | map:{recording:false, else:true}"
+          },
+          {
+            "button": "Stop Recording",
+            "icon": "stop.circle",
+            "on": "finish",
+            "style": "destructive",
+            "size": "l",
+            "grow": true,
+            "disabled": "$running.finish",
+            "platforms": [
+              "macos"
+            ],
+            "when": "$phase | map:{recording:true, else:false}"
+          },
+          {
+            "button": "Start on My Mac",
+            "icon": "record.circle",
+            "on": "ask_start",
+            "style": "primary",
+            "size": "l",
+            "grow": true,
+            "platforms": [
+              "ios"
+            ],
+            "when": "$phase | map:{recording:false, starting:false, sending:false, else:true}"
+          },
+          {
+            "button": "Stop and Send to iPhone",
+            "icon": "stop.circle",
+            "on": "ask_stop",
+            "style": "destructive",
+            "size": "l",
+            "grow": true,
+            "platforms": [
+              "ios"
+            ],
+            "when": "$phase | map:{recording:true, else:false}"
+          },
+          {
+            "row": [
+              {
+                "badge": "Waiting for your Mac",
+                "busy": true,
+                "tone": "accent"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "button": "Stop Waiting",
+                "on": "forget",
+                "style": "plain"
+              }
+            ],
+            "align": "center",
+            "platforms": [
+              "ios"
+            ],
+            "when": "$phase | map:{starting:true, sending:true, else:false}"
+          },
+          {
+            "text": "Your Mac needs to be on with TailApps open and Screen Recording allowed. macOS shows that it is recording.",
+            "size": "xs",
+            "emphasis": "subtle",
+            "platforms": [
+              "ios"
+            ],
+            "when": "$phase | map:{idle:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "record.circle",
+      "card": "main",
+      "label": "$phase | map:{recording:'REC', else:''}",
+      "label_tone": "$phase | map:{recording:'bad', else:'neutral'}"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

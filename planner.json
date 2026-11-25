@@ -1,0 +1,313 @@
+{
+  "schema": "tailapps/v0",
+  "app": "planner",
+  "name": "Planner",
+  "description": "A calendar you keep yourself: day, week, month, year and agenda views, tap a day or an hour to add an event, tap an event to delete it. On the Mac and iPhone.",
+  "icon": "calendar",
+  "version": 1,
+  "permissions": [],
+  "state": {
+    "events": {
+      "type": "list",
+      "default": []
+    },
+    "title": {
+      "type": "text",
+      "default": ""
+    },
+    "when": {
+      "type": "number",
+      "default": 0
+    },
+    "hue": {
+      "type": "text",
+      "default": "blue"
+    },
+    "adding": {
+      "type": "bool",
+      "default": false
+    }
+  },
+  "actions": {
+    "sample": {
+      "steps": [
+        {
+          "set": {
+            "events": [
+              {
+                "id": "s1",
+                "title": "Stand-up",
+                "start": "$now | add:3600",
+                "end": "$now | add:5400",
+                "hue": "blue"
+              },
+              {
+                "id": "s2",
+                "title": "Design review",
+                "start": "$now | add:10800",
+                "end": "$now | add:14400",
+                "hue": "purple",
+                "location": "Studio"
+              },
+              {
+                "id": "s3",
+                "title": "Gym",
+                "start": "$now | add:93600",
+                "end": "$now | add:97200",
+                "hue": "green"
+              },
+              {
+                "id": "s4",
+                "title": "Lunch with Sam",
+                "start": "$now | add:169200",
+                "end": "$now | add:174600",
+                "hue": "orange",
+                "location": "Corner café"
+              },
+              {
+                "id": "s5",
+                "title": "Planning",
+                "start": "$now | add:259200",
+                "end": "$now | add:266400",
+                "hue": "indigo"
+              },
+              {
+                "id": "s6",
+                "title": "Dentist",
+                "start": "$now | add:435600",
+                "end": "$now | add:439200",
+                "hue": "red"
+              },
+              {
+                "id": "s7",
+                "title": "Call with the team",
+                "start": "$now | add:777600",
+                "end": "$now | add:781200",
+                "hue": "blue"
+              },
+              {
+                "id": "s8",
+                "title": "Workshop",
+                "start": "$now | add:1728000",
+                "end": "$now | add:1738800",
+                "hue": "teal"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "start_add": {
+      "steps": [
+        {
+          "set": {
+            "when": "$args.date",
+            "title": "",
+            "adding": true
+          }
+        }
+      ]
+    },
+    "new_event": {
+      "steps": [
+        {
+          "set": {
+            "when": "$now",
+            "title": "",
+            "adding": true
+          }
+        }
+      ]
+    },
+    "add": {
+      "steps": [
+        {
+          "if": "$title",
+          "then": [
+            {
+              "push": {
+                "events": {
+                  "id": "{$now}-{$events | count}",
+                  "title": "$title",
+                  "start": "$when",
+                  "end": "$when | add:3600",
+                  "hue": "$hue"
+                }
+              },
+              "at": "end"
+            },
+            {
+              "set": {
+                "adding": false,
+                "title": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "cancel": {
+      "steps": [
+        {
+          "set": {
+            "adding": false
+          }
+        }
+      ]
+    },
+    "delete_event": {
+      "steps": [
+        {
+          "remove": {
+            "events": {
+              "match": {
+                "id": "$args.item.id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "clear": {
+      "confirm": "Remove every event?",
+      "steps": [
+        {
+          "set": {
+            "events": []
+          }
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "column": [
+              {
+                "field": "Event",
+                "type": "text",
+                "bind": "$title",
+                "placeholder": "What's happening?",
+                "on_submit": "add"
+              },
+              {
+                "field": "Starts",
+                "type": "date",
+                "time": true,
+                "bind": "$when"
+              },
+              {
+                "field": "Colour",
+                "type": "segmented",
+                "bind": "$hue",
+                "options": [
+                  {
+                    "label": "Blue",
+                    "value": "blue"
+                  },
+                  {
+                    "label": "Green",
+                    "value": "green"
+                  },
+                  {
+                    "label": "Orange",
+                    "value": "orange"
+                  },
+                  {
+                    "label": "Purple",
+                    "value": "purple"
+                  },
+                  {
+                    "label": "Red",
+                    "value": "red"
+                  }
+                ]
+              },
+              {
+                "row": [
+                  {
+                    "spacer": true
+                  },
+                  {
+                    "button": "Cancel",
+                    "style": "secondary",
+                    "on": "cancel"
+                  },
+                  {
+                    "button": "Add",
+                    "style": "primary",
+                    "on": "add",
+                    "disabled": "$title | default:'none' | map:{none:true, else:false}"
+                  }
+                ],
+                "gap": "s"
+              }
+            ],
+            "style": "inset",
+            "when": "$adding"
+          },
+          {
+            "calendar": "$events",
+            "views": [
+              "day",
+              "week",
+              "month",
+              "year",
+              "agenda"
+            ],
+            "view": "week",
+            "hours": {
+              "from": 7,
+              "to": 21
+            },
+            "on_day": "start_add",
+            "on_select": "delete_event",
+            "select_label": "Delete"
+          },
+          {
+            "button": "Add sample events",
+            "icon": "sparkles",
+            "style": "secondary",
+            "on": "sample",
+            "grow": true,
+            "when": "$events | count | map:{0:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          {
+            "text": "{$events | count} events",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "spacer": true
+          },
+          {
+            "button": "Clear",
+            "style": "plain",
+            "on": "clear",
+            "disabled": "$events | count | map:{0:true, else:false}"
+          },
+          {
+            "button": "New event",
+            "icon": "plus",
+            "on": "new_event"
+          }
+        ],
+        "align": "center"
+      }
+    }
+  ],
+  "views": {
+    "floating": {
+      "card": "main",
+      "width": "wide"
+    }
+  }
+}

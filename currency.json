@@ -1,0 +1,167 @@
+{
+  "schema": "tailapps/v0",
+  "app": "currency",
+  "name": "Currency Converter",
+  "description": "Convert an amount between 30 currencies with the European Central Bank's daily rates (free, no key): pick from and to, swap them, and see a few others at a glance.",
+  "icon": "dollarsign.arrow.circlepath",
+  "version": 1,
+  "permissions": ["net:api.frankfurter.dev"],
+  "state": {
+    "amount": { "type": "number", "default": 100 },
+    "from": { "type": "text", "default": "USD" },
+    "to": { "type": "text", "default": "EUR" },
+    "others": {
+      "type": "list",
+      "default": [
+        { "code": "GBP", "cc": "GB", "name": "British pound" },
+        { "code": "JPY", "cc": "JP", "name": "Japanese yen" },
+        { "code": "PLN", "cc": "PL", "name": "Polish złoty" },
+        { "code": "CHF", "cc": "CH", "name": "Swiss franc" }
+      ]
+    }
+  },
+  "sources": { "rates": { "fetch": "https://api.frankfurter.dev/v1/latest?base={$from}", "every": 3600, "on": "open" } },
+  "actions": {
+    "load": { "steps": [{ "refresh": "rates" }] },
+    "swap": { "args": { "from": "text", "to": "text" }, "steps": [{ "set": { "from": "$args.from", "to": "$args.to" } }, { "refresh": "rates" }] },
+    "use": { "args": { "code": "text" }, "steps": [{ "set": { "to": "$args.code" } }] }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "field": "Amount", "type": "number", "bind": "$amount" },
+          {
+            "field": "From",
+            "type": "select",
+            "bind": "$from",
+            "options": [
+              { "label": "🇦🇺 AUD", "value": "AUD" },
+              { "label": "🇧🇷 BRL", "value": "BRL" },
+              { "label": "🇨🇦 CAD", "value": "CAD" },
+              { "label": "🇨🇭 CHF", "value": "CHF" },
+              { "label": "🇨🇳 CNY", "value": "CNY" },
+              { "label": "🇨🇿 CZK", "value": "CZK" },
+              { "label": "🇩🇰 DKK", "value": "DKK" },
+              { "label": "🇪🇺 EUR", "value": "EUR" },
+              { "label": "🇬🇧 GBP", "value": "GBP" },
+              { "label": "🇭🇰 HKD", "value": "HKD" },
+              { "label": "🇭🇺 HUF", "value": "HUF" },
+              { "label": "🇮🇩 IDR", "value": "IDR" },
+              { "label": "🇮🇱 ILS", "value": "ILS" },
+              { "label": "🇮🇳 INR", "value": "INR" },
+              { "label": "🇮🇸 ISK", "value": "ISK" },
+              { "label": "🇯🇵 JPY", "value": "JPY" },
+              { "label": "🇰🇷 KRW", "value": "KRW" },
+              { "label": "🇲🇽 MXN", "value": "MXN" },
+              { "label": "🇲🇾 MYR", "value": "MYR" },
+              { "label": "🇳🇴 NOK", "value": "NOK" },
+              { "label": "🇳🇿 NZD", "value": "NZD" },
+              { "label": "🇵🇭 PHP", "value": "PHP" },
+              { "label": "🇵🇱 PLN", "value": "PLN" },
+              { "label": "🇷🇴 RON", "value": "RON" },
+              { "label": "🇸🇪 SEK", "value": "SEK" },
+              { "label": "🇸🇬 SGD", "value": "SGD" },
+              { "label": "🇹🇭 THB", "value": "THB" },
+              { "label": "🇹🇷 TRY", "value": "TRY" },
+              { "label": "🇺🇸 USD", "value": "USD" },
+              { "label": "🇿🇦 ZAR", "value": "ZAR" }
+            ],
+            "on_change": "load"
+          },
+          {
+            "field": "To",
+            "type": "select",
+            "bind": "$to",
+            "options": [
+              { "label": "🇦🇺 AUD", "value": "AUD" },
+              { "label": "🇧🇷 BRL", "value": "BRL" },
+              { "label": "🇨🇦 CAD", "value": "CAD" },
+              { "label": "🇨🇭 CHF", "value": "CHF" },
+              { "label": "🇨🇳 CNY", "value": "CNY" },
+              { "label": "🇨🇿 CZK", "value": "CZK" },
+              { "label": "🇩🇰 DKK", "value": "DKK" },
+              { "label": "🇪🇺 EUR", "value": "EUR" },
+              { "label": "🇬🇧 GBP", "value": "GBP" },
+              { "label": "🇭🇰 HKD", "value": "HKD" },
+              { "label": "🇭🇺 HUF", "value": "HUF" },
+              { "label": "🇮🇩 IDR", "value": "IDR" },
+              { "label": "🇮🇱 ILS", "value": "ILS" },
+              { "label": "🇮🇳 INR", "value": "INR" },
+              { "label": "🇮🇸 ISK", "value": "ISK" },
+              { "label": "🇯🇵 JPY", "value": "JPY" },
+              { "label": "🇰🇷 KRW", "value": "KRW" },
+              { "label": "🇲🇽 MXN", "value": "MXN" },
+              { "label": "🇲🇾 MYR", "value": "MYR" },
+              { "label": "🇳🇴 NOK", "value": "NOK" },
+              { "label": "🇳🇿 NZD", "value": "NZD" },
+              { "label": "🇵🇭 PHP", "value": "PHP" },
+              { "label": "🇵🇱 PLN", "value": "PLN" },
+              { "label": "🇷🇴 RON", "value": "RON" },
+              { "label": "🇸🇪 SEK", "value": "SEK" },
+              { "label": "🇸🇬 SGD", "value": "SGD" },
+              { "label": "🇹🇭 THB", "value": "THB" },
+              { "label": "🇹🇷 TRY", "value": "TRY" },
+              { "label": "🇺🇸 USD", "value": "USD" },
+              { "label": "🇿🇦 ZAR", "value": "ZAR" }
+            ]
+          },
+          {
+            "column": [
+              {
+                "stat": "$rates.rates | pick:$to | times:$amount | currency:$to:'full' | default:'—'",
+                "label": "{$amount | number} {$from}",
+                "size": "xl"
+              },
+              {
+                "row": [
+                  {
+                    "text": "1 {$from} = {$rates.rates | pick:$to | number:4 | default:'—'} {$to} · ECB rate of {$rates.date | date}",
+                    "size": "s",
+                    "emphasis": "subtle"
+                  },
+                  { "spacer": true },
+                  {
+                    "button": "Swap",
+                    "icon": "arrow.left.arrow.right",
+                    "icon_only": true,
+                    "style": "plain",
+                    "on": "swap",
+                    "args": { "from": "$to", "to": "$from" },
+                    "keys": "mod+s"
+                  }
+                ],
+                "gap": "s",
+                "align": "center"
+              }
+            ],
+            "gap": "xs",
+            "when": "$meta.rates.status | map:{ok:true, else:false}"
+          },
+          { "text": "Couldn't load rates: {$meta.rates.error}", "size": "s", "tone": "bad", "when": "$meta.rates.error" },
+          {
+            "column": [
+              {
+                "list": "$others",
+                "item": {
+                  "cell": "$rates.rates | pick:$item.code | times:$amount | currency:$item.code:'full' | default:'—'",
+                  "subtitle": "$item.name",
+                  "leading": "$item.cc | flag",
+                  "accessory": "chevron",
+                  "on": "use",
+                  "args": { "code": "$item.code" },
+                  "selected": { "value": "$item.code", "is": "$to" }
+                }
+              }
+            ],
+            "style": "inset",
+            "when": "$meta.rates.status | map:{ok:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": { "menubar": { "icon": "dollarsign.arrow.circlepath", "card": "main" }, "floating": { "card": "main", "width": "default" } }
+}

@@ -1,0 +1,286 @@
+{
+  "schema": "tailapps/v0",
+  "app": "notes",
+  "name": "Notes",
+  "description": "Quick notes with titles, colours and Markdown (lists, tick boxes, quotes). Click a note to edit it. On the Mac and iPhone.",
+  "icon": "note.text",
+  "version": 1,
+  "permissions": [],
+  "state": {
+    "notes": {
+      "type": "list",
+      "default": [
+        {
+          "id": "1",
+          "title": "Trip",
+          "text": "## Packing\n- [x] Passport\n- [ ] Chargers\n- [ ] Rain jacket\n\n> Train leaves at 9:40, platform 4.",
+          "hue": "blue",
+          "at": 1795219985
+        },
+        {
+          "id": "2",
+          "title": "Garden",
+          "text": "Ask the shop about **tomato seedlings**.\n1. Fix the fence\n2. Order compost",
+          "hue": "orange",
+          "at": 1795133585
+        },
+        {
+          "id": "3",
+          "title": "",
+          "text": "Idea: a card that shows the tide times for the beach this weekend {icon:water.waves:teal}",
+          "hue": null,
+          "at": 1795047185
+        }
+      ]
+    },
+    "draft": {
+      "type": "text",
+      "default": ""
+    },
+    "draft_title": {
+      "type": "text",
+      "default": ""
+    },
+    "draft_hue": {
+      "type": "text",
+      "default": "yellow"
+    },
+    "editing": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "actions": {
+    "new_note": {
+      "steps": [
+        {
+          "set": {
+            "editing": "new",
+            "draft": "",
+            "draft_title": "",
+            "draft_hue": "yellow"
+          }
+        }
+      ]
+    },
+    "edit": {
+      "args": {
+        "id": "text",
+        "title": "text",
+        "text": "text",
+        "hue": "text"
+      },
+      "steps": [
+        {
+          "set": {
+            "editing": "$args.id",
+            "draft": "$args.text",
+            "draft_title": "$args.title",
+            "draft_hue": "$args.hue"
+          }
+        }
+      ]
+    },
+    "save": {
+      "steps": [
+        {
+          "if": "$editing | map:{new:true, else:false}",
+          "then": [
+            {
+              "push": {
+                "notes": {
+                  "id": "{$now}-{$notes | count}",
+                  "title": "$draft_title",
+                  "text": "$draft",
+                  "hue": "$draft_hue",
+                  "at": "$now"
+                }
+              }
+            }
+          ],
+          "else": [
+            {
+              "update": {
+                "notes": {
+                  "match": {
+                    "id": "$editing"
+                  },
+                  "set": {
+                    "title": "$draft_title",
+                    "text": "$draft",
+                    "hue": "$draft_hue",
+                    "at": "$now"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "set": {
+            "editing": ""
+          }
+        }
+      ]
+    },
+    "cancel": {
+      "steps": [
+        {
+          "set": {
+            "editing": ""
+          }
+        }
+      ]
+    },
+    "delete": {
+      "confirm": "Delete this note?",
+      "steps": [
+        {
+          "remove": {
+            "notes": {
+              "match": {
+                "id": "$editing"
+              }
+            }
+          }
+        },
+        {
+          "set": {
+            "editing": ""
+          }
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "column": [
+              {
+                "field": "Title",
+                "type": "text",
+                "bind": "$draft_title",
+                "placeholder": "Title"
+              },
+              {
+                "field": "",
+                "type": "textarea",
+                "bind": "$draft",
+                "placeholder": "Write a note… Markdown works: - lists, - [ ] tick boxes, > quotes",
+                "on_submit": "save"
+              },
+              {
+                "field": "Colour",
+                "type": "segmented",
+                "bind": "$draft_hue",
+                "options": [
+                  {
+                    "label": "Yellow",
+                    "value": "yellow"
+                  },
+                  {
+                    "label": "Blue",
+                    "value": "blue"
+                  },
+                  {
+                    "label": "Green",
+                    "value": "green"
+                  },
+                  {
+                    "label": "Orange",
+                    "value": "orange"
+                  },
+                  {
+                    "label": "Pink",
+                    "value": "pink"
+                  }
+                ]
+              },
+              {
+                "row": [
+                  {
+                    "button": "Delete",
+                    "style": "destructive",
+                    "icon": "trash",
+                    "icon_only": true,
+                    "on": "delete",
+                    "when": "$editing | map:{new:false, else:true}"
+                  },
+                  {
+                    "spacer": true
+                  },
+                  {
+                    "button": "Cancel",
+                    "style": "secondary",
+                    "on": "cancel"
+                  },
+                  {
+                    "button": "Save",
+                    "style": "primary",
+                    "on": "save"
+                  }
+                ],
+                "gap": "s"
+              }
+            ],
+            "gap": "s",
+            "when": "$editing"
+          },
+          {
+            "list": "$notes",
+            "empty": "No notes yet",
+            "when": "$editing | default:'none' | map:{none:true, else:false}",
+            "item": {
+              "message": "$item.text",
+              "style": "note",
+              "title": "$item.title",
+              "hue": "$item.hue",
+              "markdown": true,
+              "lines": 6,
+              "time": "$item.at | ago",
+              "on": "edit",
+              "args": {
+                "id": "$item.id",
+                "title": "$item.title",
+                "text": "$item.text",
+                "hue": "$item.hue"
+              }
+            }
+          }
+        ],
+        "gap": "m"
+      },
+      "footer": {
+        "row": [
+          {
+            "text": "{$notes | count} notes",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "spacer": true
+          },
+          {
+            "button": "New note",
+            "icon": "square.and.pencil",
+            "on": "new_note",
+            "when": "$editing | default:'none' | map:{none:true, else:false}"
+          }
+        ],
+        "align": "center"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "note.text"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

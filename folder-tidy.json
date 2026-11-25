@@ -1,0 +1,125 @@
+{
+  "schema": "tailapps/v0",
+  "app": "folder-tidy",
+  "name": "Folder Tidy",
+  "description": "Lists a folder you choose, moves files out one at a time or all at once (a job you can stop, with a note when done), and puts a word in front of every name. Mac only. Never deletes.",
+  "icon": "folder.badge.gearshape",
+  "version": 1,
+  "permissions": ["files.write:inbox", "files.write:done", "notify"],
+  "settings": {
+    "inbox": { "type": "folder", "label": "Folder to tidy", "default": "~/Downloads", "required": true },
+    "done": { "type": "folder", "label": "Move files to", "default": "~/Documents/Filed", "create": true, "required": true },
+    "prefix": { "type": "text", "label": "Word to put in front of names", "default": "Filed" }
+  },
+  "state": {
+    "files": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "scan": {
+      "steps": [
+        { "files.list": "$settings.inbox", "as": "found" },
+        { "set": { "files": "$found" } }
+      ]
+    },
+    "move_one": {
+      "steps": [
+        { "files.move": { "file": "$args.item", "to": "$settings.done" } },
+        { "files.list": "$settings.inbox", "as": "found" },
+        { "set": { "files": "$found" } },
+        { "toast": "Moved {$args.item.name}" }
+      ]
+    },
+    "move_all": {
+      "confirm": "Move every file in the folder?",
+      "job": true,
+      "timeout": 1800,
+      "steps": [
+        { "files.list": "$settings.inbox", "as": "found" },
+        { "each": "$found", "do": [{ "files.move": { "file": "$item", "to": "$settings.done" } }], "max": 1000, "as": "moved" },
+        { "files.list": "$settings.inbox", "as": "left" },
+        { "set": { "files": "$left" } },
+        { "toast": "Moved {$moved.done} files" }
+      ]
+    },
+    "prefix_all": {
+      "confirm": "Put '{$settings.prefix}' in front of every name?",
+      "job": true,
+      "timeout": 1800,
+      "steps": [
+        { "files.list": "$settings.inbox", "as": "found" },
+        { "each": "$found", "do": [{ "files.rename": { "file": "$item", "name": "{$settings.prefix} {$item.base}" } }], "max": 1000, "as": "renamed" },
+        { "files.list": "$settings.inbox", "as": "left" },
+        { "set": { "files": "$left" } },
+        { "toast": "Renamed {$renamed.done} files" }
+      ]
+    },
+    "stop_move": {
+      "steps": [
+        { "job.cancel": "move_all" },
+        { "files.list": "$settings.inbox", "as": "left" },
+        { "set": { "files": "$left" } }
+      ]
+    },
+    "stop_prefix": {
+      "steps": [
+        { "job.cancel": "prefix_all" },
+        { "files.list": "$settings.inbox", "as": "left" },
+        { "set": { "files": "$left" } }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "list": "$files",
+            "limit": 50,
+            "empty": "Nothing in the folder. Press Scan.",
+            "swipe": {
+              "trailing": [
+                { "label": "Move", "icon": "folder", "on": "move_one" }
+              ]
+            },
+            "item": {
+              "cell": "$item.name",
+              "subtitle": "$item.size | bytes",
+              "leading": "doc"
+            }
+          },
+          {
+            "progress": "$job.move_all.progress",
+            "label": "Moving {$job.move_all.done} of {$job.move_all.total}",
+            "when": "$running.move_all"
+          },
+          {
+            "progress": "$job.prefix_all.progress",
+            "label": "Renaming {$job.prefix_all.done} of {$job.prefix_all.total}",
+            "when": "$running.prefix_all"
+          },
+          {
+            "text": "Stopped after {$job.move_all.done} of {$job.move_all.total}.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$job.move_all.status | map:{cancelled:true, else:false}"
+          },
+          {
+            "row": [
+              { "button": "Stop", "on": "stop_move", "style": "secondary", "when": "$running.move_all" },
+              { "button": "Stop", "on": "stop_prefix", "style": "secondary", "when": "$running.prefix_all" },
+              { "button": "Scan", "on": "scan", "style": "secondary", "disabled": "$running.scan" },
+              { "button": "Add prefix", "on": "prefix_all", "style": "secondary", "disabled": "$running.prefix_all" },
+              { "button": "Move all", "on": "move_all", "style": "primary", "disabled": "$running.move_all" }
+            ],
+            "justify": "end"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "label": "{$files | count} files", "label_icon": "folder" }
+  }
+}

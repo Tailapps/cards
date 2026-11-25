@@ -1,0 +1,102 @@
+{
+  "schema": "tailapps/v0",
+  "app": "summarise",
+  "name": "Summarise",
+  "description": "Paste any text and get a short summary and its to-dos from the AI model built into your Mac or iPhone, then translate the summary. Nothing leaves the device. Needs Apple Intelligence.",
+  "icon": "sparkles",
+  "version": 1,
+  "permissions": ["ai.generate", "translate", "clipboard.write"],
+  "state": {
+    "draft": { "type": "text", "default": "" },
+    "result": { "type": "object", "default": {} },
+    "lang": { "type": "text", "default": "fr" },
+    "translated": { "type": "text", "default": "" }
+  },
+  "actions": {
+    "summarise": {
+      "steps": [
+        {
+          "if": "$draft",
+          "then": [
+            { "set": { "translated": "" } },
+            {
+              "ai.generate": {
+                "prompt": "Summarise this in two or three sentences, and list any to-dos it mentions (none is fine):\n\n{$draft}",
+                "shape": { "summary": "text", "todos": ["text"] }
+              },
+              "as": "out"
+            },
+            { "set": { "result": "$out" } }
+          ],
+          "else": [{ "toast": "Paste some text first" }]
+        }
+      ]
+    },
+    "translate": {
+      "steps": [
+        { "translate": "$result.summary", "to": "$lang", "as": "text" },
+        { "set": { "translated": "$text" } }
+      ]
+    },
+    "copy": {
+      "args": { "text": "text" },
+      "steps": [
+        { "clipboard.write": { "text": "$args.text" } },
+        { "toast": "Copied" }
+      ]
+    },
+    "clear": {
+      "steps": [{ "set": { "draft": "", "result": {}, "translated": "" } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "field": "", "type": "textarea", "bind": "$draft", "placeholder": "Paste an email, notes or an article…", "on_submit": "summarise" },
+          {
+            "row": [
+              { "button": "Summarise", "on": "summarise", "style": "primary", "icon": "sparkles" },
+              { "spacer": true },
+              { "button": "Clear", "on": "clear", "style": "plain", "when": "$draft" }
+            ],
+            "align": "center"
+          },
+          { "badge": "Thinking on this device", "busy": true, "tone": "accent", "when": "$running.summarise" },
+          {
+            "section": "Summary",
+            "when": "$result.summary",
+            "children": [
+              { "text": "$result.summary", "lines": 8 },
+              {
+                "row": [
+                  { "field": "", "type": "select", "bind": "$lang", "options": [
+                    { "label": "French", "value": "fr" }, { "label": "German", "value": "de" },
+                    { "label": "Spanish", "value": "es" }, { "label": "Polish", "value": "pl" }
+                  ] },
+                  { "button": "Translate", "on": "translate", "style": "plain", "icon": "translate" },
+                  { "spacer": true },
+                  { "button": "Copy", "on": "copy", "args": { "text": "$result.summary" }, "style": "plain" }
+                ],
+                "align": "center"
+              },
+              { "text": "$translated", "lines": 8, "emphasis": "subtle", "when": "$translated" }
+            ]
+          },
+          {
+            "section": "To-dos",
+            "when": "$result.todos",
+            "children": [
+              { "list": "$result.todos", "limit": 10, "item": { "cell": "$item", "leading": "circle" } }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "icon": "sparkles", "card": "main" }
+  }
+}

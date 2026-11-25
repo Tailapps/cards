@@ -1,0 +1,102 @@
+{
+  "schema": "tailapps/v0",
+  "app": "plants",
+  "name": "Plants",
+  "description": "When each plant was last watered. Tap one for its own screen, with Watered and Delete. Plants and History are tabs along the bottom on the iPhone and in the Mac's pop-out.",
+  "icon": "leaf",
+  "version": 1,
+  "permissions": [],
+  "state": {
+    "plants": {
+      "type": "list",
+      "default": [
+        { "id": "1", "name": "Monstera", "room": "Living room", "watered": 1795000000 },
+        { "id": "2", "name": "Basil", "room": "Kitchen", "watered": 1795500000 },
+        { "id": "3", "name": "Fiddle-leaf fig", "room": "Bedroom", "watered": 1794600000 }
+      ]
+    },
+    "log": { "type": "list", "default": [] }
+  },
+  "actions": {
+    "open_plant": {
+      "args": { "id": "text" },
+      "steps": [
+        { "open_card": "plant", "args": { "id": "$args.id" } }
+      ]
+    },
+    "add": {
+      "steps": [
+        { "ask": { "title": "New plant", "message": "What is it called?", "input": "text" }, "as": "name" },
+        {
+          "if": "$name",
+          "then": [
+            { "push": { "plants": { "id": "{$now}", "name": "$name", "room": "Unsorted", "watered": "$now" } } },
+            { "toast": "Added {$name}" }
+          ]
+        }
+      ]
+    },
+    "water": {
+      "args": { "id": "text", "name": "text" },
+      "steps": [
+        { "update": { "plants": { "match": { "id": "$args.id" }, "set": { "watered": "$now" } } } },
+        { "push": { "log": { "name": "$args.name", "at": "$now" } }, "at": "front" },
+        { "toast": "Watered {$args.name}" },
+        { "close_card": true }
+      ]
+    },
+    "delete_plant": {
+      "args": { "id": "text", "name": "text" },
+      "steps": [
+        { "remove": { "plants": { "match": { "id": "$args.id" } } } },
+        { "toast": "Deleted {$args.name}" },
+        { "close_card": true }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "plants",
+      "toolbar": [{ "label": "Add a plant", "icon": "plus", "on": "add" }],
+      "layout": {
+        "list": "$plants",
+        "empty": "No plants yet. Add one with +.",
+        "item": {
+          "cell": "$item.name",
+          "subtitle": "{$item.room} · watered {$item.watered | ago}",
+          "leading": "leaf",
+          "accessory": "chevron",
+          "on": "open_plant",
+          "args": { "id": "$item.id" }
+        }
+      }
+    },
+    {
+      "id": "history",
+      "layout": {
+        "list": "$log",
+        "empty": "Nothing watered yet.",
+        "item": { "cell": "$item.name", "subtitle": "$item.at | ago", "leading": "drop" }
+      }
+    },
+    {
+      "id": "plant",
+      "params": { "id": "text" },
+      "toolbar": [{ "label": "Delete", "icon": "trash", "on": "delete_plant", "args": { "id": "$plants | where:'id':$params.id | pick:0 | pick:'id'", "name": "$plants | where:'id':$params.id | pick:0 | pick:'name'" }, "style": "destructive" }],
+      "layout": {
+        "column": [
+          { "text": "$plants | where:'id':$params.id | pick:0 | pick:'name'", "size": "l", "emphasis": "strong" },
+          { "text": "$plants | where:'id':$params.id | pick:0 | pick:'room'", "tone": "neutral" },
+          { "stat": "$plants | where:'id':$params.id | pick:0 | pick:'watered' | ago", "label": "Last watered" },
+          { "button": "Watered today", "icon": "drop.fill", "on": "water", "args": { "id": "$plants | where:'id':$params.id | pick:0 | pick:'id'", "name": "$plants | where:'id':$params.id | pick:0 | pick:'name'" } }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "icon": "leaf", "label": "{$plants | count} plants", "card": "plants" },
+    "floating": { "tabs": [{ "card": "plants", "label": "Plants", "icon": "leaf" }, { "card": "history", "label": "History", "icon": "clock" }] },
+    "phone": { "tabs": [{ "card": "plants", "label": "Plants", "icon": "leaf" }, { "card": "history", "label": "History", "icon": "clock" }] }
+  }
+}

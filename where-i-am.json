@@ -1,0 +1,71 @@
+{
+  "schema": "tailapps/v0",
+  "app": "where-i-am",
+  "name": "Where I Am",
+  "description": "Tap Share Where I Am on your iPhone (or Mac) and your other devices see the place on a map. One fix per tap, never in the background, with no script.",
+  "icon": "location",
+  "version": 1,
+  "permissions": ["location", "inbox:places", "send:places"],
+  "state": {
+    "here": { "type": "any", "default": null, "sync": false },
+    "places": { "type": "list", "default": [] }
+  },
+  "sources": {
+    "shared": { "inbox": "places", "on_receive": "received" }
+  },
+  "actions": {
+    "share": {
+      "steps": [
+        { "location.get": { "accuracy": "best" }, "as": "fix" },
+        { "set": { "here": "$fix" } },
+        { "send": { "places": { "lat": "$fix.lat", "lng": "$fix.lng", "accuracy": "$fix.accuracy", "at": "$fix.at" } } }
+      ]
+    },
+    "received": {
+      "steps": [
+        {
+          "push": { "places": { "lat": "$args.event.lat", "lng": "$args.event.lng", "accuracy": "$args.event.accuracy", "at": "$args.event.at", "label": "$args.from" } },
+          "at": "front",
+          "max": 10
+        }
+      ]
+    },
+    "clear": {
+      "confirm": "Forget the places on this device?",
+      "steps": [{ "set": { "places": [], "here": null } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "map": "$places", "center": "$here", "height": "l", "when": "$places | count" },
+          {
+            "column": [
+              {
+                "list": "$places",
+                "item": { "cell": "$item.label", "subtitle": "{$item.at | ago} · within {$item.accuracy | number} m", "leading": "mappin.and.ellipse" }
+              }
+            ],
+            "style": "inset",
+            "when": "$places | count"
+          },
+          { "text": "Nothing shared yet. Tap Share Where I Am on another of your devices.", "size": "s", "emphasis": "subtle", "when": "$places | count | map:{0:true, else:false}" },
+          {
+            "row": [
+              { "button": "Share Where I Am", "on": "share", "style": "primary", "icon": "location.fill", "grow": true },
+              { "button": "Clear", "on": "clear", "style": "secondary", "when": "$places | count" }
+            ],
+            "gap": "s"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": { "icon": "location", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

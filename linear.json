@@ -1,0 +1,56 @@
+{
+  "schema": "tailapps/v0",
+  "app": "linear",
+  "name": "Linear",
+  "description": "The Linear issues assigned to you. Sign in with Linear on the card, no API key. Works on your Mac and your iPhone; each one signs in on its own.",
+  "icon": "checkmark.circle",
+  "version": 1,
+  "permissions": ["net:api.linear.app", "open:url"],
+  "oauth": {
+    "linear": {
+      "name": "Linear",
+      "authorize": "https://linear.app/oauth/authorize",
+      "token": "https://api.linear.app/oauth/token",
+      "client_id": "59acb0ffa2aaf74205376710fcd077a9",
+      "scope": "read",
+      "hosts": ["api.linear.app"],
+      "params": { "prompt": "consent" }
+    }
+  },
+  "state": {
+    "issues": { "type": "list", "default": [] }
+  },
+  "sources": {
+    "issues": {
+      "fetch": "https://api.linear.app/graphql",
+      "method": "POST",
+      "auth": "oauth:linear",
+      "body": { "query": "{ viewer { assignedIssues(first: 20, filter: { state: { type: { nin: [\"completed\", \"canceled\"] } } }, orderBy: updatedAt) { nodes { identifier title url state { name } } } } }" },
+      "select": "data.viewer.assignedIssues.nodes",
+      "every": 300
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          { "list": "$issues", "limit": 10, "empty": "Nothing assigned to you",
+            "item": { "cell": "$item.title", "subtitle": "{$item.identifier} · {$item.state.name}", "accessory": "chevron", "on": "open_issue", "args": { "url": "$item.url" } } },
+          { "text": "Updated {$meta.issues.updated | ago}", "size": "xs", "emphasis": "subtle", "when": "$meta.issues.updated" }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "actions": {
+    "open_issue": {
+      "args": { "url": "text" },
+      "steps": [{ "open": "$args.url" }]
+    }
+  },
+  "views": {
+    "menubar": { "icon": "checkmark.circle", "in_menu": "row", "label": "{$issues | count} issues", "card": "main" },
+    "floating": { "card": "main", "width": "default" }
+  }
+}

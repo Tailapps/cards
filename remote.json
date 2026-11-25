@@ -1,0 +1,402 @@
+{
+  "schema": "tailapps/v0",
+  "app": "remote",
+  "name": "Remote",
+  "description": "iPhone buttons that run commands on your Mac (deploy to Vercel, git pull, git status) in one project folder; the Mac replies to that phone. Turn on Sync to My Devices on both.",
+  "icon": "av.remote",
+  "version": 1,
+  "permissions": [
+    "script:run.sh",
+    "inbox:jobs",
+    "send:jobs",
+    "inbox:results",
+    "send:results"
+  ],
+  "settings": {
+    "project": {
+      "type": "folder",
+      "label": "Project folder",
+      "required": true,
+      "sync": false,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "scripts": {
+    "run.sh": "#!/bin/sh\n# Runs one of three fixed jobs in the project folder ($2) and prints { job, ok, output } as JSON.\n# $1 names the job; it is never run as a command, and anything else is refused. Always exits 0, so the\n# app can reply to the phone that asked even when the job fails.\njob=\"$1\"\ndir=\"$2\"\nreply() { printf '%s' \"$3\" | tail -n 15 | jq -Rs --arg job \"$1\" --argjson ok \"$2\" '{job: $job, ok: $ok, output: .}'; }\nif ! cd \"$dir\" 2>/dev/null; then\n  reply \"$job\" false \"The project folder is missing. Pick it again in Settings.\"\n  exit 0\nfi\ncase \"$job\" in\n  deploy) out=$(vercel deploy --prod --yes 2>&1) ;;\n  pull) out=$(git pull --ff-only 2>&1) ;;\n  status) out=$(git status --short --branch 2>&1) ;;\n  *) reply \"$job\" false \"Unknown job\"; exit 0 ;;\nesac\nif [ $? -eq 0 ]; then reply \"$job\" true \"$out\"; else reply \"$job\" false \"$out\"; fi\n"
+  },
+  "state": {
+    "last": {
+      "type": "object",
+      "default": {}
+    },
+    "waiting": {
+      "type": "text",
+      "default": "",
+      "sync": false
+    }
+  },
+  "sources": {
+    "jobs": {
+      "inbox": "jobs",
+      "on_receive": "asked",
+      "platforms": [
+        "macos"
+      ]
+    },
+    "results": {
+      "inbox": "results",
+      "on_receive": "answered"
+    }
+  },
+  "actions": {
+    "run": {
+      "args": {
+        "job": "enum:deploy|pull|status"
+      },
+      "confirm": "Run {$args.job} in the project folder?",
+      "timeout": 660,
+      "steps": [
+        {
+          "script": "run.sh",
+          "args": [
+            "$args.job",
+            "$settings.project"
+          ],
+          "timeout": 600,
+          "as": "out"
+        },
+        {
+          "set": {
+            "last": {
+              "job": "$out.job",
+              "ok": "$out.ok",
+              "output": "$out.output",
+              "at": "$now"
+            }
+          }
+        }
+      ]
+    },
+    "ask": {
+      "args": {
+        "job": "enum:deploy|pull|status"
+      },
+      "confirm": "Ask your Mac to run {$args.job}?",
+      "steps": [
+        {
+          "send": {
+            "jobs": {
+              "job": "$args.job",
+              "at": "$now"
+            }
+          }
+        },
+        {
+          "set": {
+            "waiting": "$args.job"
+          }
+        }
+      ]
+    },
+    "asked": {
+      "timeout": 660,
+      "steps": [
+        {
+          "if": "$args.event.job | map:{deploy:true, else:false}",
+          "then": [
+            {
+              "script": "run.sh",
+              "args": [
+                "deploy",
+                "$settings.project"
+              ],
+              "timeout": 600,
+              "as": "out"
+            },
+            {
+              "set": {
+                "last": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              }
+            },
+            {
+              "send": {
+                "results": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              },
+              "to": "$args.from_id",
+              "alert": "Deploy on your Mac: {$out.ok | map:{true:'done', else:'failed'}}"
+            }
+          ]
+        },
+        {
+          "if": "$args.event.job | map:{pull:true, else:false}",
+          "then": [
+            {
+              "script": "run.sh",
+              "args": [
+                "pull",
+                "$settings.project"
+              ],
+              "timeout": 600,
+              "as": "out"
+            },
+            {
+              "set": {
+                "last": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              }
+            },
+            {
+              "send": {
+                "results": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              },
+              "to": "$args.from_id",
+              "alert": "Pull on your Mac: {$out.ok | map:{true:'done', else:'failed'}}"
+            }
+          ]
+        },
+        {
+          "if": "$args.event.job | map:{status:true, else:false}",
+          "then": [
+            {
+              "script": "run.sh",
+              "args": [
+                "status",
+                "$settings.project"
+              ],
+              "timeout": 600,
+              "as": "out"
+            },
+            {
+              "set": {
+                "last": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              }
+            },
+            {
+              "send": {
+                "results": {
+                  "job": "$out.job",
+                  "ok": "$out.ok",
+                  "output": "$out.output",
+                  "at": "$now"
+                }
+              },
+              "to": "$args.from_id",
+              "alert": "Status on your Mac: {$out.ok | map:{true:'done', else:'failed'}}"
+            }
+          ]
+        }
+      ]
+    },
+    "answered": {
+      "steps": [
+        {
+          "if": "$args.event.job",
+          "then": [
+            {
+              "set": {
+                "last": {
+                  "job": "$args.event.job",
+                  "ok": "$args.event.ok",
+                  "output": "$args.event.output",
+                  "at": "$args.event.at"
+                },
+                "waiting": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "forget": {
+      "steps": [
+        {
+          "set": {
+            "waiting": ""
+          }
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "text": "$last.job | map:{deploy:'Deploy', pull:'Pull', status:'Status', else:'Nothing run yet'}",
+                "emphasis": "strong",
+                "grow": true
+              },
+              {
+                "badge": "$last.ok | map:{true:'Done', else:'Failed'}",
+                "tone": "$last.ok | map:{true:'good', else:'bad'}",
+                "when": "$last.job"
+              }
+            ],
+            "align": "center"
+          },
+          {
+            "badge": "Running on this Mac",
+            "busy": true,
+            "tone": "accent",
+            "when": "$running.run",
+            "platforms": ["macos"]
+          },
+          {
+            "badge": "Running a job another device asked for",
+            "busy": true,
+            "tone": "accent",
+            "when": "$running.asked",
+            "platforms": ["macos"]
+          },
+          {
+            "text": "$last.output | default:'Press a button to run a job.'",
+            "size": "xs",
+            "mono": true,
+            "lines": 8
+          },
+          {
+            "text": "{$last.job | upper} · {$last.at | ago}",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$last.job"
+          },
+          {
+            "row": [
+              {
+                "badge": "Waiting for your Mac: {$waiting}",
+                "busy": true,
+                "tone": "accent"
+              },
+              {
+                "spacer": true
+              },
+              {
+                "button": "Stop Waiting",
+                "on": "forget",
+                "style": "plain"
+              }
+            ],
+            "align": "center",
+            "when": "$waiting",
+            "platforms": [
+              "ios"
+            ]
+          },
+          {
+            "row": [
+              {
+                "button": "Deploy",
+                "on": "run",
+                "args": {
+                  "job": "deploy"
+                },
+                "style": "primary",
+                "disabled": "$running.run"
+              },
+              {
+                "button": "Pull",
+                "on": "run",
+                "args": {
+                  "job": "pull"
+                },
+                "disabled": "$running.run"
+              },
+              {
+                "button": "Status",
+                "on": "run",
+                "args": {
+                  "job": "status"
+                },
+                "disabled": "$running.run"
+              }
+            ],
+            "gap": "s",
+            "when": "$running.asked | map:{true:false, else:true}",
+            "platforms": [
+              "macos"
+            ]
+          },
+          {
+            "grid": [
+              {
+                "button": "Deploy",
+                "on": "ask",
+                "args": {
+                  "job": "deploy"
+                },
+                "style": "primary",
+                "size": "l",
+                "disabled": "$waiting"
+              },
+              {
+                "button": "Pull",
+                "on": "ask",
+                "args": {
+                  "job": "pull"
+                },
+                "size": "l",
+                "disabled": "$waiting"
+              },
+              {
+                "button": "Status",
+                "on": "ask",
+                "args": {
+                  "job": "status"
+                },
+                "size": "l",
+                "disabled": "$waiting"
+              }
+            ],
+            "columns": 3,
+            "gap": "s",
+            "platforms": [
+              "ios"
+            ]
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "av.remote",
+      "card": "main",
+      "label": "$last.ok | map:{true:'', false:'Failed', else:''}",
+      "label_tone": "$last.ok | map:{true:'neutral', else:'bad'}"
+    },
+    "floating": {
+      "card": "main",
+      "width": "default"
+    }
+  }
+}

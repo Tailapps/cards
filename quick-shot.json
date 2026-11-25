@@ -1,0 +1,315 @@
+{
+  "schema": "tailapps/v0",
+  "app": "quick-shot",
+  "name": "Quick Shot",
+  "description": "Grab a screen region, copy it and pull out the text; saves to a folder or a bucket, and can send each shot to your iPhone.",
+  "icon": "camera.viewfinder",
+  "permissions": [
+    "screen.capture",
+    "vision.ocr",
+    "clipboard.write",
+    "files.write:dest",
+    "inbox:shots",
+    "send:shots"
+  ],
+  "settings": {
+    "dest": {
+      "type": "storage",
+      "label": "Save shots to",
+      "default": "~/Pictures/Quick Shot",
+      "create": true,
+      "required": true,
+      "platforms": [
+        "macos"
+      ]
+    },
+    "to_devices": {
+      "type": "toggle",
+      "label": "Also send shots to my other devices",
+      "default": false,
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "sources": {
+    "incoming": {
+      "inbox": "shots",
+      "on_receive": "got_shot"
+    }
+  },
+  "state": {
+    "shots": {
+      "type": "list",
+      "default": []
+    },
+    "lastText": {
+      "type": "text",
+      "default": ""
+    },
+    "lastLink": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "button": "Grab region",
+            "on": "grab",
+            "style": "primary",
+            "disabled": "$running.grab",
+            "keys": "mod+g"
+          },
+          {
+            "gallery": "$shots",
+            "limit": 3,
+            "height": "m",
+            "thumb": "$item.thumb",
+            "on_select": "copy_shot"
+          },
+          {
+            "text": "$lastText | default:'Grab a region to read its text.'",
+            "lines": 6,
+            "size": "s"
+          },
+          {
+            "row": [
+              {
+                "button": "Copy text",
+                "on": "copy_text",
+                "style": "secondary",
+                "disabled": "$lastText | count | map:{0:true, else:false}"
+              },
+              {
+                "button": "Copy link",
+                "on": "copy_link",
+                "style": "secondary",
+                "disabled": "$lastLink | count | map:{0:true, else:false}"
+              }
+            ],
+            "justify": "end"
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "phone",
+      "layout": {
+        "column": [
+          {
+            "gallery": "$shots",
+            "limit": 12,
+            "height": "m",
+            "thumb": "$item.thumb",
+            "preview": true
+          },
+          {
+            "text": "Tap a shot to see it full size, then save or share it.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$shots"
+          },
+          {
+            "text": "Shots you grab on your Mac show up here.",
+            "size": "s",
+            "emphasis": "subtle",
+            "when": "$shots | count | map:{0:true, else:false}"
+          },
+          {
+            "section": "Text in the last shot",
+            "collapsible": true,
+            "collapsed": true,
+            "when": "$lastText",
+            "children": [
+              {
+                "text": "$lastText",
+                "lines": 8,
+                "size": "s"
+              },
+              {
+                "row": [
+                  {
+                    "button": "Copy text",
+                    "on": "copy_text",
+                    "style": "secondary"
+                  }
+                ],
+                "justify": "end"
+              }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "actions": {
+    "grab": {
+      "steps": [
+        {
+          "screen.capture": {
+            "mode": "region"
+          },
+          "as": "img"
+        },
+        {
+          "files.save": {
+            "data": "$img",
+            "to": "$settings.dest",
+            "name": "shot-{$now}.png"
+          },
+          "as": "saved"
+        },
+        {
+          "vision.ocr": "$img",
+          "as": "text"
+        },
+        {
+          "clipboard.write": {
+            "image": "$img"
+          }
+        },
+        {
+          "set": {
+            "lastText": "$text",
+            "lastLink": "$saved.url"
+          }
+        },
+        {
+          "if": "$saved.path",
+          "then": [
+            {
+              "push": {
+                "shots": {
+                  "thumb": "$saved.path",
+                  "url": "$saved.url",
+                  "kind": "$saved.kind"
+                }
+              },
+              "max": 24
+            }
+          ],
+          "else": [
+            {
+              "push": {
+                "shots": {
+                  "thumb": "$img",
+                  "url": "$saved.url",
+                  "kind": "$saved.kind"
+                }
+              },
+              "max": 24
+            }
+          ]
+        },
+        {
+          "if": "$settings.to_devices",
+          "then": [
+            {
+              "send": {
+                "shots": {
+                  "text": "$text",
+                  "link": "$saved.url",
+                  "at": "$now"
+                }
+              },
+              "file": "$img",
+              "alert": "New screenshot"
+            }
+          ]
+        }
+      ]
+    },
+    "got_shot": {
+      "steps": [
+        {
+          "set": {
+            "lastText": "$args.event.text",
+            "lastLink": "$args.event.link"
+          }
+        },
+        {
+          "if": "$args.file",
+          "then": [
+            {
+              "push": {
+                "shots": {
+                  "thumb": "$args.file",
+                  "url": "$args.event.link",
+                  "kind": "received"
+                }
+              },
+              "max": 24
+            }
+          ]
+        }
+      ]
+    },
+    "copy_text": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$lastText"
+          }
+        }
+      ]
+    },
+    "copy_link": {
+      "steps": [
+        {
+          "clipboard.write": {
+            "text": "$lastLink"
+          }
+        }
+      ]
+    },
+    "copy_shot": {
+      "steps": [
+        {
+          "if": "$args.item.kind | map:{s3:true, else:false}",
+          "then": [
+            {
+              "clipboard.write": {
+                "text": "$args.item.url"
+              }
+            }
+          ],
+          "else": [
+            {
+              "clipboard.write": {
+                "image": "$args.item.thumb"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "views": {
+    "menubar": {
+      "icon": "camera.viewfinder",
+      "label": "{$shots | count} shots",
+      "card": "main"
+    },
+    "floating": {
+      "card": "main",
+      "pin": true
+    },
+    "phone": {
+      "card": "phone"
+    }
+  },
+  "shortcuts": {
+    "actions": {
+      "grab": {
+        "keys": "ctrl+shift+2",
+        "scope": "global"
+      }
+    }
+  }
+}

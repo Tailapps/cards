@@ -1,0 +1,50 @@
+{
+  "schema": "tailapps/v0",
+  "app": "year-progress",
+  "name": "Year Progress",
+  "description": "How much of the year has gone, as a big number and a bar, with the day of the year and the days still to go. Underneath: this quarter, month, week and today. The year's percentage can sit in your menu bar.",
+  "icon": "calendar.badge.clock",
+  "version": 1,
+  "permissions": [],
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              { "text": "$now | date:'year'", "size": "l", "emphasis": "strong", "grow": true },
+              { "text": "$now | through:'year' | percent:0", "size": "xl", "emphasis": "strong", "mono": true }
+            ],
+            "align": "center"
+          },
+          { "progress": "$now | through:'year'", "size": "xl", "split": 12 },
+          {
+            "text": "Day {$now | through:'year':'day'} of {$now | through:'year':'days'} · {$now | through:'year':'left'} to go",
+            "size": "s",
+            "emphasis": "subtle"
+          },
+          {
+            "section": "So far",
+            "children": [
+              { "progress": "$now | through:'quarter'", "label": "This quarter", "percent": true },
+              { "progress": "$now | through:'month'", "label": "This month", "percent": true },
+              { "progress": "$now | through:'week'", "label": "This week", "percent": true, "split": 7 },
+              { "progress": "$now | through:'day'", "label": "Today", "percent": true }
+            ]
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "calendar.badge.clock",
+      "label": "$now | through:'year' | percent:0",
+      "card": "main",
+      "in_menu": "card"
+    },
+    "floating": { "card": "main", "width": "narrow" }
+  }
+}

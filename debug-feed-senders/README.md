@@ -2,6 +2,16 @@
 
 [Debug Feed](../debug-feed.json) shows whatever your code posts to its inbox on your Mac. Install the card first, then pick a sender.
 
+## Any language, no token
+
+The card listens on its own port, `47312`, on this Mac only. Post JSON to it from anything that can make an HTTP request:
+
+```sh
+curl -d '{"value":"hi","label":"test"}' 127.0.0.1:47312
+```
+
+Use `127.0.0.1` rather than `localhost`, which some clients look up as IPv6 first. Only programs on your Mac can reach it: web pages are refused.
+
 ## From a shell
 
 ```sh
@@ -24,8 +34,6 @@ curl -s "http://127.0.0.1:$port/inbox/debug-feed/log" \
   -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
   -d '{"type":"sql","sql":"select * from coupons limit 1","ms":0.84,"connection":"mysql","label":"Query"}'
 ```
-
-Any language works the same way: read the two files, then POST JSON with that header.
 
 ## What the card takes
 

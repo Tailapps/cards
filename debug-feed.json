@@ -1,0 +1,633 @@
+{
+  "schema": "tailapps/v0",
+  "app": "debug-feed",
+  "name": "Debug Feed",
+  "description": "A live feed of what your code sends it: messages, values as JSON, SQL with timings and tables, labelled and coloured. Search, filter, pause, pin and copy. Mac only.",
+  "icon": "ladybug",
+  "version": 1,
+  "permissions": [
+    "inbox:log",
+    "clipboard.write"
+  ],
+  "state": {
+    "entries": {
+      "type": "list",
+      "default": []
+    },
+    "seq": {
+      "type": "number",
+      "default": 0
+    },
+    "paused": {
+      "type": "bool",
+      "default": false
+    },
+    "missed": {
+      "type": "number",
+      "default": 0
+    },
+    "query": {
+      "type": "text",
+      "default": ""
+    },
+    "colour": {
+      "type": "text",
+      "default": ""
+    },
+    "show": {
+      "type": "text",
+      "default": ""
+    },
+    "draft": {
+      "type": "any",
+      "default": null
+    },
+    "picked": {
+      "type": "any",
+      "default": null
+    },
+    "place": {
+      "type": "any",
+      "default": null
+    },
+    "size": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "sources": {
+    "incoming": {
+      "inbox": "log",
+      "on_receive": "take",
+      "platforms": [
+        "macos"
+      ]
+    }
+  },
+  "actions": {
+    "take": {
+      "steps": [
+        {
+          "if": "$paused",
+          "then": [
+            {
+              "if": "$args.event.type | map:{batch:true, else:false}",
+              "then": [
+                {
+                  "set": {
+                    "size": "$args.event.entries | count"
+                  }
+                },
+                {
+                  "increment": {
+                    "missed": "$size"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "increment": {
+                    "missed": 1
+                  }
+                }
+              ]
+            }
+          ],
+          "else": [
+            {
+              "if": "$args.event.type | map:{batch:true, else:false}",
+              "then": [
+                {
+                  "each": "$args.event.entries",
+                  "max": 200,
+                  "do": [
+                    {
+                      "increment": {
+                        "seq": 1
+                      }
+                    },
+                    {
+                      "set": {
+                        "draft": "$item.value"
+                      }
+                    },
+                    {
+                      "if": "$item.value | map:{null:true, else:false}",
+                      "then": [
+                        {
+                          "set": {
+                            "draft": "$item"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "set": {
+                        "place": "$item.file"
+                      }
+                    },
+                    {
+                      "if": "$item.file",
+                      "then": [
+                        {
+                          "if": "$item.line",
+                          "then": [
+                            {
+                              "set": {
+                                "place": "{$item.file}:{$item.line}"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "push": {
+                        "entries": {
+                          "id": "{$seq}",
+                          "kind": "$item.type | map:{sql:'sql', table:'table', text:'text', string:'text', log:'text', else:'value'}",
+                          "label": "$item.label",
+                          "hue": "$item.color | map:{red:'red', orange:'orange', yellow:'yellow', green:'green', blue:'blue', purple:'purple', gray:'gray', grey:'gray', else:''}",
+                          "data": "$draft",
+                          "sql": "$item.sql",
+                          "ms": "$item.ms",
+                          "connection": "$item.connection",
+                          "rows": "$item.rows",
+                          "file": "$place",
+                          "project": "$item.project",
+                          "at": "$now",
+                          "pinned": false
+                        }
+                      },
+                      "at": "end",
+                      "max": 500
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "increment": {
+                    "seq": 1
+                  }
+                },
+                {
+                  "set": {
+                    "draft": "$args.event.value"
+                  }
+                },
+                {
+                  "if": "$args.event.value | map:{null:true, else:false}",
+                  "then": [
+                    {
+                      "set": {
+                        "draft": "$args.event"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "set": {
+                    "place": "$args.event.file"
+                  }
+                },
+                {
+                  "if": "$args.event.file",
+                  "then": [
+                    {
+                      "if": "$args.event.line",
+                      "then": [
+                        {
+                          "set": {
+                            "place": "{$args.event.file}:{$args.event.line}"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "push": {
+                    "entries": {
+                      "id": "{$seq}",
+                      "kind": "$args.event.type | map:{sql:'sql', table:'table', text:'text', string:'text', log:'text', else:'value'}",
+                      "label": "$args.event.label",
+                      "hue": "$args.event.color | map:{red:'red', orange:'orange', yellow:'yellow', green:'green', blue:'blue', purple:'purple', gray:'gray', grey:'gray', else:''}",
+                      "data": "$draft",
+                      "sql": "$args.event.sql",
+                      "ms": "$args.event.ms",
+                      "connection": "$args.event.connection",
+                      "rows": "$args.event.rows",
+                      "file": "$place",
+                      "project": "$args.event.project",
+                      "at": "$now",
+                      "pinned": false
+                    }
+                  },
+                  "at": "end",
+                  "max": 500
+                }
+              ]
+            },
+            {
+              "set": {
+                "draft": null,
+                "place": null
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pause": {
+      "steps": [
+        {
+          "if": "$paused",
+          "then": [
+            {
+              "set": {
+                "paused": false,
+                "missed": 0
+              }
+            }
+          ],
+          "else": [
+            {
+              "set": {
+                "paused": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "clear": {
+      "steps": [
+        {
+          "remove": {
+            "entries": {
+              "match": {
+                "pinned": false
+              }
+            }
+          }
+        },
+        {
+          "set": {
+            "missed": 0
+          }
+        }
+      ]
+    },
+    "pin": {
+      "args": {
+        "id": "text",
+        "pinned": "bool"
+      },
+      "steps": [
+        {
+          "update": {
+            "entries": {
+              "match": {
+                "id": "$args.id"
+              },
+              "set": {
+                "pinned": "$args.pinned"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "forget": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "remove": {
+            "entries": {
+              "match": {
+                "id": "$args.id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "copy": {
+      "args": {
+        "id": "text"
+      },
+      "steps": [
+        {
+          "set": {
+            "picked": "$entries | where:'id':$args.id | pick:0"
+          }
+        },
+        {
+          "if": "$picked.kind | map:{sql:true, else:false}",
+          "then": [
+            {
+              "clipboard.write": {
+                "text": "$picked.sql"
+              }
+            }
+          ],
+          "else": [
+            {
+              "if": "$picked.kind | map:{table:true, else:false}",
+              "then": [
+                {
+                  "clipboard.write": {
+                    "text": "$picked.rows | json"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "clipboard.write": {
+                    "text": "$picked.data | json"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "set": {
+            "picked": null
+          }
+        },
+        {
+          "toast": "Copied"
+        }
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "feed",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "field": "Search",
+                "type": "search",
+                "bind": "$query",
+                "placeholder": "Search the feed",
+                "grow": true
+              },
+              {
+                "button": "$paused | map:{true:'Resume', else:'Pause'}",
+                "icon": "$paused | map:{true:'play.fill', else:'pause.fill'}",
+                "icon_only": true,
+                "on": "pause",
+                "style": "plain"
+              },
+              {
+                "button": "Clear",
+                "icon": "trash",
+                "icon_only": true,
+                "on": "clear",
+                "style": "plain"
+              }
+            ],
+            "align": "center",
+            "gap": "s"
+          },
+          {
+            "row": [
+              {
+                "field": "Show",
+                "type": "segmented",
+                "bind": "$show",
+                "options": [
+                  {
+                    "label": "All",
+                    "value": ""
+                  },
+                  {
+                    "label": "Pinned",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "field": "Colour",
+                "type": "select",
+                "bind": "$colour",
+                "options": [
+                  {
+                    "label": "Every colour",
+                    "value": ""
+                  },
+                  {
+                    "label": "Red",
+                    "value": "red"
+                  },
+                  {
+                    "label": "Orange",
+                    "value": "orange"
+                  },
+                  {
+                    "label": "Yellow",
+                    "value": "yellow"
+                  },
+                  {
+                    "label": "Green",
+                    "value": "green"
+                  },
+                  {
+                    "label": "Blue",
+                    "value": "blue"
+                  },
+                  {
+                    "label": "Purple",
+                    "value": "purple"
+                  },
+                  {
+                    "label": "Gray",
+                    "value": "gray"
+                  }
+                ]
+              }
+            ],
+            "align": "center",
+            "gap": "s",
+            "wrap": true
+          },
+          {
+            "text": "Paused. {$missed | number} skipped since.",
+            "size": "s",
+            "tone": "warn",
+            "when": "$paused"
+          },
+          {
+            "list": "$entries | search:$query:'label,data,sql,connection,rows,file,project' | search:$colour:'hue' | search:$show:'pinned'",
+            "scroll": "end",
+            "height": "fill",
+            "limit": 200,
+            "empty": "Nothing yet. Send JSON to this card's inbox: run tailapps-hook debug-feed/log, or post to it from your code.",
+            "item": {
+              "column": [
+                {
+                  "row": [
+                    {
+                      "icon": "pin.fill",
+                      "size": "s",
+                      "tone": "accent",
+                      "when": "$item.pinned"
+                    },
+                    {
+                      "badge": "$item.label",
+                      "hue": "$item.hue | default:'gray'",
+                      "when": "$item.label"
+                    },
+                    {
+                      "text": "$item.file",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "mono": true,
+                      "lines": 1,
+                      "grow": true
+                    },
+                    {
+                      "text": "$item.project",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "lines": 1,
+                      "when": "$item.project"
+                    },
+                    {
+                      "text": "$item.at | time:'local':'seconds'",
+                      "size": "s",
+                      "emphasis": "subtle",
+                      "mono": true
+                    },
+                    {
+                      "menu": "More",
+                      "icon": "ellipsis",
+                      "icon_only": true,
+                      "items": [
+                        {
+                          "label": "Copy",
+                          "on": "copy",
+                          "args": {
+                            "id": "$item.id"
+                          }
+                        },
+                        {
+                          "label": "Pin or Unpin",
+                          "on": "pin",
+                          "args": {
+                            "id": "$item.id",
+                            "pinned": "$item.pinned | map:{true:false, else:true}"
+                          }
+                        },
+                        {
+                          "label": "Remove",
+                          "on": "forget",
+                          "args": {
+                            "id": "$item.id"
+                          },
+                          "style": "destructive"
+                        }
+                      ]
+                    }
+                  ],
+                  "align": "center",
+                  "gap": "s"
+                },
+                {
+                  "text": "$item.data",
+                  "lines": 20,
+                  "when": "$item.kind | map:{text:true, else:false}"
+                },
+                {
+                  "code": "$item.data | json",
+                  "lang": "json",
+                  "lines": 14,
+                  "copy": false,
+                  "when": "$item.kind | map:{value:true, else:false}"
+                },
+                {
+                  "code": "$item.sql",
+                  "lang": "sql",
+                  "lines": 14,
+                  "copy": false,
+                  "when": "$item.kind | map:{sql:true, else:false}"
+                },
+                {
+                  "text": "{$item.connection | default:'SQL'} · {$item.ms | default:'?'} ms",
+                  "size": "s",
+                  "emphasis": "subtle",
+                  "when": "$item.kind | map:{sql:true, else:false}"
+                },
+                {
+                  "table": "$item.rows",
+                  "columns": [
+                    {
+                      "label": "Key",
+                      "value": "$item.key"
+                    },
+                    {
+                      "label": "Value",
+                      "value": "$item.value | json:'line'",
+                      "mono": true
+                    }
+                  ],
+                  "empty": "No rows",
+                  "when": "$item.kind | map:{table:true, else:false}"
+                }
+              ],
+              "gap": "xs",
+              "context_menu": [
+                {
+                  "label": "Copy",
+                  "icon": "doc.on.doc",
+                  "on": "copy",
+                  "args": {
+                    "id": "$item.id"
+                  }
+                },
+                {
+                  "label": "Pin or Unpin",
+                  "icon": "pin",
+                  "on": "pin",
+                  "args": {
+                    "id": "$item.id",
+                    "pinned": "$item.pinned | map:{true:false, else:true}"
+                  }
+                },
+                {
+                  "label": "Remove",
+                  "icon": "trash",
+                  "on": "forget",
+                  "args": {
+                    "id": "$item.id"
+                  },
+                  "style": "destructive"
+                }
+              ]
+            }
+          }
+        ],
+        "gap": "s"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "ladybug",
+      "label": "$paused | map:{true:'Paused', else:''}",
+      "label_tone": "$paused | map:{true:'warn', else:'neutral'}",
+      "in_menu": "row"
+    },
+    "floating": {
+      "card": "feed",
+      "width": "wide"
+    }
+  }
+}

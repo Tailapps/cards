@@ -49,6 +49,10 @@
     "place": {
       "type": "any",
       "default": null
+    },
+    "size": {
+      "type": "number",
+      "default": 0
     }
   },
   "sources": {
@@ -70,8 +74,13 @@
               "if": "$args.event.type | map:{batch:true, else:false}",
               "then": [
                 {
+                  "set": {
+                    "size": "$args.event.entries | count"
+                  }
+                },
+                {
                   "increment": {
-                    "missed": "$args.event.entries | count"
+                    "missed": "$size"
                   }
                 }
               ],

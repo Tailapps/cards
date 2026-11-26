@@ -57,6 +57,7 @@ Ask your agent to build one (TailApps has an MCP server and a [developer guide](
 | [Wallpaper](wallpaper.json) | Drop a picture to make it your desktop picture, on all screens or the main one, and switch back from a gallery. With Sync to My Devices on, pick or take a photo on your iPhone to set it. |
 | [Dictate](dictate.json) | Hold a shortcut on the Mac (or tap Record on the iPhone), speak, let go: your words become text on your clipboard. Turn on Share and Sync to My Devices to see them on your other devices. |
 | [Transcribe a File](transcribe-file.json) | Drop a voice memo or any audio file (on iPhone, tap to choose one) and get its text, made on this device. Copy it with one click. |
+| [Now Playing](now-playing.json) | What Music or Spotify is playing on your Mac, with the cover, live progress and play, pause and skip. Your iPhone shows and controls it too: turn on Sync to My Devices on both. Needs TailApps with the `media` source. |
 
 ### Across devices
 

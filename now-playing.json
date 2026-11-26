@@ -1,0 +1,296 @@
+{
+  "schema": "tailapps/v0",
+  "app": "now-playing",
+  "name": "Now Playing",
+  "description": "What Music or Spotify is playing on your Mac, with the cover, live progress and play, pause and skip. Your iPhone shows and controls it too: turn on Sync to My Devices on both.",
+  "icon": "play.circle",
+  "version": 1,
+  "permissions": [
+    "media.read",
+    "media.control",
+    "inbox:cmd",
+    "send:cmd",
+    "net:itunes.apple.com",
+    "net:i.scdn.co",
+    "net:is1-ssl.mzstatic.com",
+    "net:is2-ssl.mzstatic.com",
+    "net:is3-ssl.mzstatic.com",
+    "net:is4-ssl.mzstatic.com",
+    "net:is5-ssl.mzstatic.com"
+  ],
+  "state": {
+    "track": { "type": "object", "default": {}, "sync": true },
+    "cover": { "type": "text", "default": "", "sync": true },
+    "track_at": { "type": "number", "default": 0, "sync": true },
+    "covers": { "type": "list", "default": [] },
+    "asked": { "type": "text", "default": "" }
+  },
+  "on_sync": "heard",
+  "sources": {
+    "media": {
+      "system": "media",
+      "on_change": "copy",
+      "platforms": ["macos"]
+    },
+    "cmd": {
+      "inbox": "cmd",
+      "on_receive": "remote",
+      "platforms": ["macos"]
+    }
+  },
+  "actions": {
+    "copy": {
+      "steps": [
+        { "set": { "track": "$args.value", "track_at": "$now" } },
+        {
+          "if": "$args.value.artwork",
+          "then": [{ "set": { "cover": "$args.value.artwork" } }],
+          "else": [
+            {
+              "if": "$args.value.album",
+              "then": [
+                {
+                  "if": "$covers | where:'album':$args.value.album | where:'artist':$args.value.artist | pick:0",
+                  "then": [{ "set": { "cover": "$covers | where:'album':$args.value.album | where:'artist':$args.value.artist | pick:0 | pick:'url'" } }],
+                  "else": [
+                    { "set": { "cover": "" } },
+                    {
+                      "fetch": "https://itunes.apple.com/search?term={$args.value.artist | default:'' | url}+{$args.value.album | url}&entity=album&limit=1",
+                      "as": "found"
+                    },
+                    { "set": { "cover": "$found.results.0.artworkUrl100 | default:'' | split:'100x100bb' | join:'600x600bb'" } },
+                    { "push": { "covers": { "album": "$args.value.album", "artist": "$args.value.artist", "url": "$found.results.0.artworkUrl100 | default:'' | split:'100x100bb' | join:'600x600bb'" } }, "max": 50 }
+                  ]
+                }
+              ],
+              "else": [{ "set": { "cover": "" } }]
+            }
+          ]
+        }
+      ]
+    },
+    "toggle": {
+      "steps": [{ "media.toggle": {} }, { "refresh": "media" }]
+    },
+    "next": {
+      "steps": [{ "media.next": {} }, { "refresh": "media" }]
+    },
+    "previous": {
+      "steps": [{ "media.previous": {} }, { "refresh": "media" }]
+    },
+    "back": {
+      "steps": [{ "media.seek": { "by": -15 } }, { "refresh": "media" }]
+    },
+    "forward": {
+      "steps": [{ "media.seek": { "by": 15 } }, { "refresh": "media" }]
+    },
+    "remote": {
+      "steps": [
+        {
+          "if": "$args.event.at | times:-1 | add:$now | tone:{good:'<=60', else:'bad'} | map:{good:true, else:false}",
+          "then": [
+            { "set": { "track_at": "$now" } },
+            { "if": "$args.event.do | map:{toggle:true, else:false}", "then": [{ "media.toggle": {} }] },
+            { "if": "$args.event.do | map:{next:true, else:false}", "then": [{ "media.next": {} }] },
+            { "if": "$args.event.do | map:{previous:true, else:false}", "then": [{ "media.previous": {} }] },
+            { "if": "$args.event.do | map:{back:true, else:false}", "then": [{ "media.seek": { "by": -15 } }] },
+            { "if": "$args.event.do | map:{forward:true, else:false}", "then": [{ "media.seek": { "by": 15 } }] },
+            { "refresh": "media" }
+          ]
+        }
+      ]
+    },
+    "ask": {
+      "args": { "do": "text" },
+      "steps": [
+        { "set": { "asked": "$args.do" } },
+        { "send": { "cmd": { "do": "$args.do", "at": "$now" } } }
+      ]
+    },
+    "heard": {
+      "steps": [{ "set": { "asked": "" } }]
+    },
+    "forget": {
+      "steps": [{ "set": { "asked": "" } }]
+    }
+  },
+  "cards": [
+    {
+      "id": "main",
+      "layout": {
+        "column": [
+          {
+            "row": [
+              {
+                "image": "$cover",
+                "height": "xl",
+                "width": "xl",
+                "fit": "fill",
+                "alt": "Album cover",
+                "when": "$cover"
+              },
+              {
+                "icon": "$track.app | map:{Spotify:'dot.radiowaves.left.and.right', else:'music.note'}",
+                "size": "xl",
+                "tone": "accent",
+                "when": "$cover | default:'none' | map:{none:true, else:false}"
+              },
+              {
+                "column": [
+                  {
+                    "text": "$track.title | default:'Nothing playing'",
+                    "emphasis": "strong",
+                    "lines": 2
+                  },
+                  { "text": "$track.artist", "size": "s", "when": "$track.artist" },
+                  { "text": "$track.album", "size": "xs", "emphasis": "subtle", "when": "$track.album" },
+                  {
+                    "text": "$track.state | map:{none:'Open Music or Spotify to start', stopped:'Stopped', else:''}",
+                    "size": "xs",
+                    "emphasis": "subtle",
+                    "when": "$track.state | map:{none:true, stopped:true, else:false}"
+                  }
+                ],
+                "gap": "xs",
+                "grow": true
+              }
+            ],
+            "align": "center",
+            "gap": "m"
+          },
+          {
+            "progress": "$track.ends_at",
+            "from": "$track.started_at",
+            "style": "bar",
+            "when": "$track.playing"
+          },
+          {
+            "progress": "$track.progress",
+            "style": "bar",
+            "when": "$track.state | map:{paused:true, else:false}"
+          },
+          {
+            "row": [
+              { "button": "Back 15 seconds", "icon": "gobackward.15", "icon_only": true, "on": "back", "style": "plain" },
+              { "spacer": true },
+              { "button": "Previous", "icon": "backward.fill", "icon_only": true, "on": "previous", "style": "plain" },
+              {
+                "button": "$track.playing | map:{true:'Pause', else:'Play'}",
+                "icon": "$track.playing | map:{true:'pause.fill', else:'play.fill'}",
+                "icon_only": true,
+                "on": "toggle",
+                "style": "primary",
+                "size": "l"
+              },
+              { "button": "Next", "icon": "forward.fill", "icon_only": true, "on": "next", "style": "plain" },
+              { "spacer": true },
+              { "button": "Forward 15 seconds", "icon": "goforward.15", "icon_only": true, "on": "forward", "style": "plain" }
+            ],
+            "align": "center",
+            "gap": "s"
+          },
+          {
+            "text": "{$track.app} on this Mac",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$track.app"
+          }
+        ],
+        "gap": "m"
+      }
+    },
+    {
+      "id": "phone",
+      "layout": {
+        "column": [
+          {
+            "image": "$cover",
+            "height": "xl",
+            "fit": "fit",
+            "alt": "Album cover",
+            "when": "$cover"
+          },
+          {
+            "column": [
+              {
+                "text": "$track.title | default:'Nothing playing on your Mac'",
+                "size": "l",
+                "emphasis": "strong",
+                "lines": 2
+              },
+              { "text": "$track.artist", "when": "$track.artist" },
+              { "text": "$track.album", "size": "s", "emphasis": "subtle", "when": "$track.album" }
+            ],
+            "gap": "xs"
+          },
+          {
+            "progress": "$track.ends_at",
+            "from": "$track.started_at",
+            "style": "bar",
+            "when": "$track.playing"
+          },
+          {
+            "progress": "$track.progress",
+            "style": "bar",
+            "when": "$track.state | map:{paused:true, else:false}"
+          },
+          {
+            "row": [
+              { "button": "Back 15 seconds", "icon": "gobackward.15", "icon_only": true, "on": "ask", "args": { "do": "back" }, "style": "plain", "disabled": "$asked" },
+              { "spacer": true },
+              { "button": "Previous", "icon": "backward.fill", "icon_only": true, "on": "ask", "args": { "do": "previous" }, "style": "plain", "size": "l", "disabled": "$asked" },
+              {
+                "button": "$track.playing | map:{true:'Pause', else:'Play'}",
+                "icon": "$track.playing | map:{true:'pause.fill', else:'play.fill'}",
+                "icon_only": true,
+                "on": "ask",
+                "args": { "do": "toggle" },
+                "style": "primary",
+                "size": "l",
+                "disabled": "$asked"
+              },
+              { "button": "Next", "icon": "forward.fill", "icon_only": true, "on": "ask", "args": { "do": "next" }, "style": "plain", "size": "l", "disabled": "$asked" },
+              { "spacer": true },
+              { "button": "Forward 15 seconds", "icon": "goforward.15", "icon_only": true, "on": "ask", "args": { "do": "forward" }, "style": "plain", "disabled": "$asked" }
+            ],
+            "align": "center",
+            "gap": "s"
+          },
+          {
+            "row": [
+              { "badge": "Waiting for your Mac", "busy": true, "tone": "accent" },
+              { "spacer": true },
+              { "button": "Stop Waiting", "on": "forget", "style": "plain" }
+            ],
+            "align": "center",
+            "when": "$asked"
+          },
+          {
+            "text": "{$track.app | default:'Your Mac'} on your Mac · updated {$track_at | ago}",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$track_at"
+          },
+          {
+            "text": "Your Mac needs TailApps open, with Sync to My Devices on for this card on both devices.",
+            "size": "xs",
+            "emphasis": "subtle",
+            "when": "$track_at | map:{0:true, else:false}"
+          }
+        ],
+        "gap": "m"
+      }
+    }
+  ],
+  "views": {
+    "menubar": {
+      "icon": "play.circle",
+      "card": "main",
+      "in_menu": "card",
+      "label": "$track.title | default:''",
+      "label_icon": "$track.playing | map:{true:'play.fill', else:'pause.fill'}"
+    },
+    "floating": { "card": "main", "width": "narrow", "pin": true },
+    "phone": { "card": "phone" }
+  }
+}
